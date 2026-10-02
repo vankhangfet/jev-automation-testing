@@ -1013,7 +1013,7 @@ git commit -m "feat: functional and layout rule checks"
 - Create: `scripts/verify_typesafe_sdk.py`
 - Test: `tests/test_jev_client.py`
 
-Lưu ý: SDK `typesafe-sdk` được docs mô tả qua quickstart (`from typesafe import TypeSafeClient` + `client.system_one(state=..., questions=...)`, response có `.answers[key].noul/.score/.choice`, `.confidence`, `.probabilities`, usage tokens). Script verify ở Step 1 sẽ pin lại signature thật trước khi viết client.
+Lưu ý: SDK `typesafe-sdk` cài module tên `typesafe_sdk` (đã xác minh trong venv: exports `TypeSafeClient/Noul/Score/Choice`, `system_one(state, questions, *, model=None)` nhận kwarg `model`) — mọi import dùng `from typesafe_sdk import ...`. Docs quickstart mô tả (`from typesafe import TypeSafeClient` + `client.system_one(state=..., questions=...)`, response có `.answers[key].noul/.score/.choice`, `.confidence`, `.probabilities`, usage tokens). Script verify ở Step 1 sẽ pin lại signature thật trước khi viết client.
 
 - [ ] **Step 1: Viết scripts/verify_typesafe_sdk.py và chạy để pin API surface**
 
@@ -1031,13 +1031,13 @@ import sys
 
 def main() -> int:
     try:
-        import typesafe
+        import typesafe_sdk
     except ImportError:
-        print("FAIL: khong import duoc module 'typesafe' — kiem tra pip install typesafe-sdk")
+        print("FAIL: khong import duoc module 'typesafe_sdk' — kiem tra pip install typesafe-sdk")
         return 1
     names = [n for n in dir(typesafe) if not n.startswith("_")]
     print("typesafe exports:", names)
-    from typesafe import TypeSafeClient
+    from typesafe_sdk import TypeSafeClient
     print("TypeSafeClient methods:", [n for n in dir(TypeSafeClient) if not n.startswith("_")])
     for m in ("system_one", "systemOne", "judge"):
         if hasattr(TypeSafeClient, m):
@@ -1045,7 +1045,7 @@ def main() -> int:
     if not os.environ.get("TYPESAFE_API_KEY"):
         print("(khong co TYPESAFE_API_KEY — skip live ping)")
         return 0
-    from typesafe import Noul
+    from typesafe_sdk import Noul
     client = TypeSafeClient()
     resp = client.system_one(
         state="The login button says 'Sign in'.",
@@ -1143,7 +1143,7 @@ Expected: `ModuleNotFoundError: ... jev.client`
 ```python
 from __future__ import annotations
 
-from typesafe import Choice, Noul, Score
+from typesafe_sdk import Choice, Noul, Score
 
 
 def core_questions(content_quality: bool = True, error_anomaly: bool = True) -> dict:
@@ -1204,7 +1204,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from typesafe import TypeSafeClient
+from typesafe_sdk import TypeSafeClient
 
 DEFAULT_MODEL = "jev-latest"
 
