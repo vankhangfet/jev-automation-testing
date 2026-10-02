@@ -222,7 +222,7 @@ requires-dist = [
     { name = "appium-python-client", specifier = ">=5.0" },
     { name = "jinja2", specifier = ">=3" },
     { name = "pyyaml", specifier = ">=6" },
-    { name = "typesafe-sdk" },
+    { name = "typesafe-sdk", specifier = ">=0.7,<0.8" },
 ]
 
 [package.metadata.requires-dev]

@@ -14,20 +14,37 @@ def core_questions(content_quality: bool = True, error_anomaly: bool = True) -> 
                 "error_screen": "The screen displays an error message or a failed-load state.",
                 "crash_dialog": "A system dialog saying the app crashed or stopped.",
                 "empty_state": "The screen rendered but contains no content (empty list, blank body).",
-                "loading_stuck": "Only a loading indicator is visible, content never arrived.",
+                "loading_stuck": "Only a loading indicator (spinner, progress bar, 'Loading...') "
+                                 "is visible, with no content elements.",
             },
         )
     if content_quality:
         q["has_raw_i18n_key"] = Noul(
-            instructions="Does any visible element text look like an untranslated i18n key, "
-                         "e.g. `login.title`, `welcome.message`, `btn.submit`?")
+            instructions="Does any visible element text look like an untranslated i18n key?",
+            criteria={
+                "true": "Dotted lowercase identifiers that are clearly keys, e.g. login.title, "
+                        "welcome.message, btn.submit, settings.language.subtitle.",
+                "false": "Legitimate text that merely contains dots or digits: URLs "
+                         "(example.com), version strings (v1.2.3), emails, file names "
+                         "(report.pdf), prices, normal words and sentences.",
+            },
+        )
         q["has_dev_text"] = Noul(
             instructions="Does any visible text contain developer artifacts such as TODO, "
-                         "FIXME, stack traces, debug values, or filler like 'Lorem ipsum'?")
+                         "FIXME, stack traces, debug values, or filler like 'Lorem ipsum'?",
+            criteria={
+                "true": "Developer artifacts: TODO, FIXME, stack traces, debug values, "
+                        "unresolved template placeholders like {0}, %s, {{name}}, or filler "
+                        "like 'Lorem ipsum'.",
+                "false": "Intentionally displayed technical information such as build/version "
+                         "numbers on a Settings or About screen, and normal user-facing text.",
+            },
+        )
         q["typo_severity"] = Score(
-            instructions="Rate the writing quality of all visible labels and texts.",
+            instructions="Rate the writing quality of all visible labels and texts. "
+                         "If no text is visible, choose the top level.",
             criteria=[
-                "No visible text at all.",
+                "Text is garbled or unreadable (broken encoding, random characters, raw placeholders).",
                 "Severe issues: misspellings or broken grammar in multiple prominent labels.",
                 "Some misspellings or awkward grammar in one or two labels.",
                 "Minor issues only: inconsistent capitalization or spacing.",
