@@ -2717,7 +2717,9 @@ class AndroidDriver(BaseDriver):
 
     def capture(self, checkpoint: str) -> StepArtifact:
         png = self.out_dir / "artifacts" / f"{checkpoint}.png"
-        self._d.get_screenshot_as_file(str(png))
+        ok = self._d.get_screenshot_as_file(str(png))  # trả bool, KHÔNG raise khi fail
+        if not ok or not png.exists():
+            raise RuntimeError(f"screenshot failed for {checkpoint!r}")
         try:
             activity = self._d.current_activity
         except Exception:  # noqa: BLE001
