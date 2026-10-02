@@ -38,6 +38,23 @@ def test_functional_no_expectations_skipped():
     assert results[0].verdict is Verdict.SKIPPED
 
 
+def test_functional_missing_element_key_error():
+    policy = {"functional_expectations": [
+        {"checkpoint": "home", "expect_text": "x"},  # thiếu key "element"
+    ]}
+    results = functional_checks(make_state([], checkpoint="home"), policy)
+    assert results[0].verdict is Verdict.ERROR
+    assert results[0].check_id == "functional/element:invalid"
+
+
+def test_functional_bad_selector_error():
+    policy = {"functional_expectations": [
+        {"checkpoint": "home", "element": "no-prefix"},
+    ]}
+    results = functional_checks(make_state([], checkpoint="home"), policy)
+    assert results[0].verdict is Verdict.ERROR
+
+
 def test_layout_overlap_detected():
     els = [
         UIElement(id="a", text="Hello", bounds=Bounds(0, 0, 200, 100)),
@@ -46,6 +63,18 @@ def test_layout_overlap_detected():
     results = layout_checks(make_state(els), POLICY)
     overlaps = [r for r in results if r.check_id.startswith("layout/overlap")]
     assert overlaps[0].verdict is Verdict.FAIL
+
+
+def test_overlap_text_over_image_not_flagged():
+    # content_desc-only element chồng chữ là pattern text-over-image bình thường
+    els = [
+        UIElement(id="img", content_desc="Hero banner image",
+                  bounds=Bounds(0, 0, 1080, 400)),
+        UIElement(id="txt", text="Breaking News", bounds=Bounds(40, 100, 800, 160)),
+    ]
+    results = layout_checks(make_state(els), POLICY)
+    assert all(r.verdict is not Verdict.FAIL
+               for r in results if r.check_id.startswith("layout/overlap"))
 
 
 def test_layout_clean_pass():
@@ -58,10 +87,34 @@ def test_layout_clean_pass():
 
 
 def test_layout_offscreen_fail():
-    els = [UIElement(id="a", text="Far", bounds=Bounds(0, 0, 1200, 100))]  # x2 > 1080
+    # chỉ ~14% hiển thị ((1082-900)*100 / (1300*100)) → FAIL
+    els = [UIElement(id="a", text="Far", bounds=Bounds(900, 0, 2200, 100))]
     results = layout_checks(make_state(els), POLICY)
     off = [r for r in results if r.check_id.startswith("layout/offscreen")]
     assert off[0].verdict is Verdict.FAIL
+
+
+def test_offscreen_partial_clip_passes():
+    # 77% hiển thị → row bị cắt nhẹ ở mép scroll là bình thường → PASS
+    els = [UIElement(id="a", text="Header", bounds=Bounds(0, -30, 1080, 100))]
+    results = layout_checks(make_state(els), POLICY)
+    off = [r for r in results if r.check_id.startswith("layout/offscreen")]
+    assert off[0].verdict is Verdict.PASS
+
+
+def test_offscreen_fully_outside_fails():
+    els = [UIElement(id="a", text="Ghost", bounds=Bounds(0, -500, 1080, -300))]
+    results = layout_checks(make_state(els), POLICY)
+    off = [r for r in results if r.check_id.startswith("layout/offscreen")]
+    assert off[0].verdict is Verdict.FAIL
+
+
+def test_empty_screen_layout_skipped():
+    results = layout_checks(make_state([]), POLICY)
+    ids = {r.check_id: r for r in results}
+    assert set(ids) == {"layout/overlap", "layout/offscreen",
+                        "layout/truncation_candidates"}
+    assert all(r.verdict is Verdict.SKIPPED for r in results)
 
 
 def test_layout_truncation_candidates_needs_review():
