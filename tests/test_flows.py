@@ -38,6 +38,11 @@ def test_load_valid_flow(tmp_path):
     "steps:\n  - action: input\n    target: 't:x'\n",  # input thiếu value
     "steps:\n  - action: unknown_kind\n",              # không phải action/checkpoint
     "name: x\nsteps: []\n",                            # không có step nào
+    "steps: 5\n",                                      # steps không phải list
+    "steps: {a: b}\n",                                 # steps là dict, không phải list
+    "steps:\n  - checkpoint: '../evil'\n",             # checkpoint tên path-traversal
+    "steps:\n  - checkpoint: 'ho:me'\n",               # checkpoint tên có dấu ':'
+    "steps:\n  - checkpoint: 'C:/tmp/evil'\n",         # checkpoint kiểu đường dẫn
 ])
 def test_invalid_flows(tmp_path, bad):
     with pytest.raises(FlowError):
@@ -47,3 +52,22 @@ def test_invalid_flows(tmp_path, bad):
 def test_missing_file():
     with pytest.raises(FlowError):
         load_flow(Path("nope.yaml"))
+
+
+def test_kind_key_cannot_override(tmp_path):
+    flow = load_flow(_write(tmp_path, "steps:\n  - action: launch\n    kind: checkpoint\n"))
+    assert flow["steps"][0]["kind"] == "action"
+    assert flow["steps"][0]["action"] == "launch"
+
+
+def test_duplicate_checkpoint_names(tmp_path):
+    dup = "steps:\n  - checkpoint: home\n  - checkpoint: home\n"
+    with pytest.raises(FlowError):
+        load_flow(_write(tmp_path, dup))
+
+
+def test_non_utf8_file(tmp_path):
+    p = tmp_path / "flow.yaml"
+    p.write_bytes(b"\xff\xfename: x")
+    with pytest.raises(FlowError):
+        load_flow(p)
