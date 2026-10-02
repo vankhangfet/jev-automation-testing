@@ -26,11 +26,13 @@ class FakeJev:
         self.answers = answers or {}
         self.error = error
         self.states = []
+        self.seen_questions = []
 
     def judge(self, state, questions):
         if self.error:
             raise JevError(self.error)
         self.states.append(state)
+        self.seen_questions.append(questions)
         return self.answers
 
 
@@ -82,6 +84,14 @@ def test_jev_error_screen_classified():
     assert r.evidence["classified"] == "error_screen"
 
 
+def test_jev_empty_state_needs_review():
+    jev = FakeJev(answers=core_answers(choice="empty_state"))
+    results = run_checks(make_state(), POLICY, jev=jev, vision=None)
+    r = next(r for r in results if r.check_id == "error_anomaly/screen_class")
+    assert r.verdict is Verdict.NEEDS_REVIEW
+    assert r.evidence["classified"] == "empty_state"
+
+
 def test_confidence_gate_flips_to_needs_review():
     jev = FakeJev(answers=core_answers(noul=0.9, conf=0.5))
     results = run_checks(make_state(), POLICY, jev=jev, vision=None)
@@ -97,6 +107,13 @@ def test_typo_score_normalized():
     assert r.verdict is Verdict.PASS and r.score == 0.75
 
 
+def test_typo_score_fail_direction():
+    jev = FakeJev(answers=core_answers(score=1.0))  # 1/4 = 0.25 < 0.75 → fail
+    results = run_checks(make_state(), POLICY, jev=jev, vision=None)
+    r = next(r for r in results if r.check_id == "content_quality/typo")
+    assert r.verdict is Verdict.FAIL and r.score == 0.25
+
+
 def test_visual_path_with_observation():
     jev = FakeJev(answers={
         "visual_blank": {"value": 0.9, "confidence": 0.95, "probabilities": {}},
@@ -106,6 +123,7 @@ def test_visual_path_with_observation():
     vision = FakeVision()
     results = run_checks(make_state(), POLICY, jev=jev, vision=vision)
     assert vision.calls == 1
+    assert len(jev.states) == 2  # fan-out đúng 2 call: core + visual
     r = next(r for r in results if r.check_id == "visual/blank")
     assert r.verdict is Verdict.FAIL and r.path == "vision+jev"
     # state thứ 2 (visual) phải chứa visual_observation
@@ -118,6 +136,16 @@ def test_visual_unavailable_marks_skipped():
     results = run_checks(make_state(), POLICY, jev=jev, vision=vision)
     vis = [r for r in results if r.group == "visual"]
     assert vis and all(r.verdict is Verdict.SKIPPED for r in vis)
+
+
+def test_visual_jev_error_marks_error():
+    jev = FakeJev(error="api down")
+    vision = FakeVision()
+    results = run_checks(make_state(), POLICY, jev=jev, vision=vision)
+    vis = [r for r in results if r.group == "visual"]
+    assert len(vis) == 3
+    assert all(r.verdict is Verdict.ERROR and r.path == "vision+jev" for r in vis)
+    assert vision.calls == 1  # observe đã chạy trước khi jev fail
 
 
 def test_jev_error_marks_error():
@@ -135,3 +163,15 @@ def test_toggles_disable_groups():
                          vision=FakeVision())
     assert results, "jev groups vẫn chạy"
     assert all(r.group in ("content_quality", "error_anomaly") for r in results)
+
+
+def test_partial_toggle_asks_and_emits_only_enabled_groups():
+    # FakeJev trả đủ 4 answers bất kể câu hỏi — router phải lọc theo questions đã hỏi
+    policy = dict(POLICY, check_toggles=dict(POLICY["check_toggles"],
+                                             content_quality=False))
+    jev = FakeJev(answers=core_answers())
+    results = run_checks(make_state(), policy, jev=jev, vision=None)
+    assert not [r for r in results if r.check_id.startswith("content_quality/")]
+    assert "screen_class" in jev.seen_questions[0]
+    assert not any(k in jev.seen_questions[0] for k in
+                   ("has_raw_i18n_key", "has_dev_text", "typo_severity"))

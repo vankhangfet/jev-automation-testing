@@ -63,22 +63,30 @@ def _jev_checks(state: ScreenState, policy: dict, jev: JevClient) -> list[CheckR
                 for k in questions if k in _JEV_CHECK_ID]
 
     out: list[CheckResult] = []
-    if "screen_class" in answers:
+    if "screen_class" in questions and "screen_class" in answers:
         a = answers["screen_class"]
-        verdict = Verdict.PASS if a["value"] == "normal" else Verdict.FAIL
+        review_classes = set(policy.get("error_anomaly", {}).get(
+            "review_classes", ["empty_state", "loading_stuck"]))
+        if a["value"] == "normal":
+            verdict = Verdict.PASS
+        elif a["value"] in review_classes:
+            verdict = Verdict.NEEDS_REVIEW
+        else:
+            verdict = Verdict.FAIL
         r = CheckResult(_JEV_CHECK_ID["screen_class"], "error_anomaly", "jev", verdict,
                         score=a["probabilities"].get("normal"),
                         confidence=a["confidence"], probabilities=a["probabilities"],
                         evidence={"classified": a["value"]})
         out.append(apply_confidence_gate(r, gate))
-    if "has_raw_i18n_key" in answers:
+    if "has_raw_i18n_key" in questions and "has_raw_i18n_key" in answers:
         out.append(_noul_result(_JEV_CHECK_ID["has_raw_i18n_key"], "content_quality", "jev",
                                 answers["has_raw_i18n_key"], gate))
-    if "has_dev_text" in answers:
+    if "has_dev_text" in questions and "has_dev_text" in answers:
         out.append(_noul_result(_JEV_CHECK_ID["has_dev_text"], "content_quality", "jev",
                                 answers["has_dev_text"], gate))
-    if "typo_severity" in answers:
+    if "typo_severity" in questions and "typo_severity" in answers:
         a = answers["typo_severity"]
+        # 4 = len(typo_severity.criteria) - 1 — cập nhật cùng nhau khi đổi rubric
         norm = (a["value"] or 0.0) / 4.0
         threshold = float(policy.get("content_quality", {}).get("typo_pass_score", 0.75))
         r = CheckResult(_JEV_CHECK_ID["typo_severity"], "content_quality", "jev",
