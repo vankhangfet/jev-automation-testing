@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<AppiumAUT>
+  <XCUIElementTypeApplication type="Application" name="Demo" label="Demo">
+    <XCUIElementTypeWindow type="Window">
+      <XCUIElementTypeOther type="Other" name="login_container" label="">
+        <XCUIElementTypeStaticText type="StaticText" name="title" label="Welcome"
+            x="40" y="150" width="460" height="100" visible="true"/>
+        <XCUIElementTypeTextField type="TextField" name="email_field" label="Email"
+            value="demo@example.com" x="40" y="800" width="1000" height="80" visible="true"/>
+        <XCUIElementTypeButton type="Button" name="signin_btn" label="Sign in"
+            x="100" y="900" width="880" height="80" visible="true"/>
+        <XCUIElementTypeStaticText type="StaticText" name="hidden_lbl" label="Ghost"
+            x="0" y="0" width="10" height="10" visible="false"/>
+      </XCUIElementTypeOther>
+    </XCUIElementTypeWindow>
+  </XCUIElementTypeApplication>
+</AppiumAUT>
