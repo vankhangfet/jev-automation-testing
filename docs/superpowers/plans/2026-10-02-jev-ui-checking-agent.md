@@ -731,7 +731,7 @@ import xml.etree.ElementTree as ET
 
 from jev_ui_agent.models import Bounds, ScreenState, StepArtifact, UIElement
 
-_BOUNDS_RE = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
+_BOUNDS_RE = re.compile(r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]")  # chấp nhận tọa độ âm
 
 
 def parse_bounds_str(s: str) -> Bounds:
@@ -2361,12 +2361,12 @@ def run_flow(*, flow_path: Path | str, policy_path: Path | str,
                 cp = CheckpointReport(checkpoint=step["name"])
                 try:
                     artifact = driver.capture(step["name"])
-                except Exception as e:  # noqa: BLE001
+                    state = build_state(artifact, run_id=run_id, platform=platform,
+                                        app=flow["app"], viewport=device_cfg["viewport"])
+                except Exception as e:  # noqa: BLE001 — bao gồm ET.ParseError từ page_source hỏng
                     cp.error = str(e)
                     report.checkpoints.append(cp)
                     continue
-                state = build_state(artifact, run_id=run_id, platform=platform,
-                                    app=flow["app"], viewport=device_cfg["viewport"])
                 cp.screenshot = state.screenshot
                 cp.results = run_checks(state, policy, jev, vision)
                 cp.screen_score = score_checkpoint(cp.results, policy.get("weights", {}))
@@ -2679,6 +2679,13 @@ git commit -m "feat: e2e smoke run on android emulator with tuned selectors"
 ```
 
 ---
+
+## Hardening notes (từ code review các task — ghi nhớ cho task sau / Phase 2)
+
+- **Task 11**: try/except quanh checkpoint đã được mở rộng bao `build_state` (chống ET.ParseError từ page_source hỏng làm mất toàn bộ report).
+- **Phase 2 (iOS)**: `_interesting` hiện giữ container có label (Application/Window với tên app) — sẽ gây overlap false-positive trên iOS. Trước khi chạy iOS thật: loại container types hoặc cho layout check bỏ qua cặp ancestor-contained.
+- **Phase 2**: `build_state` route mọi platform != "android" sang parse_ios — nên thêm validate platform in {"android","ios"} để fail-fast.
+- **Task 13**: nếu state quá lớn bị cap 100 elements, ghi nhận truncation (spec §7 yêu cầu cảnh báo trong report) — hiện chưa có kênh; cân nhắc thêm khi cần.
 
 ## Self-Review (đã thực hiện sau khi viết plan)
 
