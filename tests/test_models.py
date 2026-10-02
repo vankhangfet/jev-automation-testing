@@ -16,6 +16,11 @@ def test_bounds_intersection():
     assert a.intersection(Bounds(200, 200, 300, 300)) is None
 
 
+def test_bounds_area_clamps_inverted():
+    assert Bounds(100, 100, 0, 0).area == 0
+    assert Bounds(0, 0, -50, -50).area == 0
+
+
 def test_verdict_values():
     assert Verdict.PASS.value == "pass"
     assert Verdict.NEEDS_REVIEW.value == "needs_review"

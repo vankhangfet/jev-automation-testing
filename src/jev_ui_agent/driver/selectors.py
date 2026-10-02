@@ -8,7 +8,10 @@ _PREFIXES = {"res-id:": "id", "acc-id:": "acc", "text:": "text", "xpath:": "xpat
 def parse(selector: str) -> tuple[str, str]:
     for prefix, kind in _PREFIXES.items():
         if selector.startswith(prefix):
-            return kind, selector[len(prefix):]
+            value = selector[len(prefix):]
+            if not value:
+                raise ValueError(f"Selector value rỗng sau prefix {prefix!r}: {selector!r}")
+            return kind, value
     raise ValueError(f"Selector phải có prefix một trong {sorted(_PREFIXES)}: {selector!r}")
 
 
@@ -16,7 +19,7 @@ def matches(el: UIElement, kind: str, value: str) -> bool:
     if kind == "id":
         if el.id == value:
             return True
-        return el.id.endswith(f"/{value}") or el.id.endswith(f":id/{value}")
+        return el.id.endswith(f"/{value}")
     if kind == "acc":
         return el.content_desc == value
     if kind == "text":

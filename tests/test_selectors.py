@@ -16,6 +16,13 @@ def test_parse_invalid():
         parse("login_btn")
 
 
+def test_parse_rejects_empty_value():
+    with pytest.raises(ValueError):
+        parse("res-id:")
+    with pytest.raises(ValueError):
+        parse("text:")
+
+
 def test_find_by_id_suffix():
     els = [UIElement(id="com.example:id/login_btn", type="Button", text="Sign in")]
     assert find_element(els, "res-id:login_btn") is els[0]
