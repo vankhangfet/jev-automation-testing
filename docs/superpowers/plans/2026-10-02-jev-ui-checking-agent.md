@@ -1156,6 +1156,8 @@ import pytest
 import jev_ui_agent.jev.client as client_mod
 from jev_ui_agent.jev.client import JevClient, JevError
 
+_QK = {"is_urgent": object(), "frustration": object(), "topic": object()}
+
 
 def _fake_resp():
     return SimpleNamespace(
@@ -1171,15 +1173,40 @@ def _fake_resp():
 
 
 def test_judge_parses_answers(monkeypatch):
-    fake = SimpleNamespace(system_one=lambda **kw: _fake_resp())
+    seen = {}
+
+    def sysone(**kw):
+        seen.update(kw)
+        return _fake_resp()
+
+    fake = SimpleNamespace(system_one=sysone)
     monkeypatch.setattr(client_mod, "TypeSafeClient", lambda *a, **kw: fake)
     jc = JevClient()
-    out = jc.judge("state", {"q": object()})
-    assert out["is_urgent"] == {"value": 1.0, "confidence": None, "probabilities": {}}
+    out = jc.judge("state", _QK)
+    assert seen["model"] == "jev-latest"
+    assert out["is_urgent"] == {"value": 1.0, "confidence": 1.0, "probabilities": {}}
     assert out["frustration"]["value"] == 2.0
+    assert out["frustration"]["confidence"] == 0.9
     assert out["frustration"]["probabilities"] == {"0": 0.1, "1": 0.2, "2": 0.7}
     assert out["topic"]["value"] == "technical"
+    assert out["topic"]["confidence"] == 0.78
     assert jc.usage == {"calls": 1, "input_tokens": 392, "output_tokens": 65}
+
+
+def test_judge_derives_noul_confidence(monkeypatch):
+    resp = SimpleNamespace(
+        answers={
+            "a": SimpleNamespace(noul=0.55, confidence=None, probabilities=None),
+            "b": SimpleNamespace(noul=0.98, confidence=None, probabilities=None),
+        },
+        usage=None,
+    )
+    fake = SimpleNamespace(system_one=lambda **kw: resp)
+    monkeypatch.setattr(client_mod, "TypeSafeClient", lambda *a, **kw: fake)
+    jc = JevClient()
+    out = jc.judge("state", {"a": object(), "b": object()})
+    assert out["a"]["confidence"] == pytest.approx(0.1)
+    assert out["b"]["confidence"] == pytest.approx(0.96)
 
 
 def test_judge_retries_then_raises(monkeypatch):
@@ -1192,10 +1219,34 @@ def test_judge_retries_then_raises(monkeypatch):
     fake = SimpleNamespace(system_one=boom)
     monkeypatch.setattr(client_mod, "TypeSafeClient", lambda *a, **kw: fake)
     jc = JevClient(retries=2)
-    jc._sleep = lambda s: None  # bỏ delay khi test
-    with pytest.raises(JevError):
+    sleeps = []
+    jc._sleep = sleeps.append  # bỏ delay khi test
+    with pytest.raises(JevError) as ei:
         jc.judge("state", {"q": object()})
     assert calls["n"] == 3  # 1 lần đầu + 2 retry
+    assert len(sleeps) == 2  # không sleep sau lần thử cuối
+    assert isinstance(ei.value.__cause__, RuntimeError)
+
+
+def test_judge_missing_answer_retries_then_raises(monkeypatch):
+    calls = {"n": 0}
+    resp = SimpleNamespace(
+        answers={"present": SimpleNamespace(noul=1.0, confidence=None, probabilities=None)},
+        usage=None,
+    )
+
+    def sysone(**kw):
+        calls["n"] += 1
+        return resp
+
+    fake = SimpleNamespace(system_one=sysone)
+    monkeypatch.setattr(client_mod, "TypeSafeClient", lambda *a, **kw: fake)
+    jc = JevClient(retries=1)
+    jc._sleep = lambda s: None
+    with pytest.raises(JevError) as ei:
+        jc.judge("state", {"present": object(), "missing": object()})
+    assert calls["n"] == 2  # answer thiếu → ValueError → retry 1 lần rồi raise
+    assert isinstance(ei.value.__cause__, ValueError)
 
 
 def test_judge_model_kwarg_fallback(monkeypatch):
@@ -1211,7 +1262,7 @@ def test_judge_model_kwarg_fallback(monkeypatch):
     monkeypatch.setattr(client_mod, "TypeSafeClient", lambda *a, **kw: fake)
     jc = JevClient()
     jc._sleep = lambda s: None
-    out = jc.judge("state", {"q": object()})
+    out = jc.judge("state", _QK)
     assert out["topic"]["value"] == "technical"
 ```
 
@@ -1240,20 +1291,37 @@ def core_questions(content_quality: bool = True, error_anomaly: bool = True) -> 
                 "error_screen": "The screen displays an error message or a failed-load state.",
                 "crash_dialog": "A system dialog saying the app crashed or stopped.",
                 "empty_state": "The screen rendered but contains no content (empty list, blank body).",
-                "loading_stuck": "Only a loading indicator is visible, content never arrived.",
+                "loading_stuck": "Only a loading indicator (spinner, progress bar, 'Loading...') "
+                                 "is visible, with no content elements.",
             },
         )
     if content_quality:
         q["has_raw_i18n_key"] = Noul(
-            instructions="Does any visible element text look like an untranslated i18n key, "
-                         "e.g. `login.title`, `welcome.message`, `btn.submit`?")
+            instructions="Does any visible element text look like an untranslated i18n key?",
+            criteria={
+                "true": "Dotted lowercase identifiers that are clearly keys, e.g. login.title, "
+                        "welcome.message, btn.submit, settings.language.subtitle.",
+                "false": "Legitimate text that merely contains dots or digits: URLs "
+                         "(example.com), version strings (v1.2.3), emails, file names "
+                         "(report.pdf), prices, normal words and sentences.",
+            },
+        )
         q["has_dev_text"] = Noul(
             instructions="Does any visible text contain developer artifacts such as TODO, "
-                         "FIXME, stack traces, debug values, or filler like 'Lorem ipsum'?")
+                         "FIXME, stack traces, debug values, or filler like 'Lorem ipsum'?",
+            criteria={
+                "true": "Developer artifacts: TODO, FIXME, stack traces, debug values, "
+                        "unresolved template placeholders like {0}, %s, {{name}}, or filler "
+                        "like 'Lorem ipsum'.",
+                "false": "Intentionally displayed technical information such as build/version "
+                         "numbers on a Settings or About screen, and normal user-facing text.",
+            },
+        )
         q["typo_severity"] = Score(
-            instructions="Rate the writing quality of all visible labels and texts.",
+            instructions="Rate the writing quality of all visible labels and texts. "
+                         "If no text is visible, choose the top level.",
             criteria=[
-                "No visible text at all.",
+                "Text is garbled or unreadable (broken encoding, random characters, raw placeholders).",
                 "Severe issues: misspellings or broken grammar in multiple prominent labels.",
                 "Some misspellings or awkward grammar in one or two labels.",
                 "Minor issues only: inconsistent capitalization or spacing.",
@@ -1322,11 +1390,12 @@ class JevClient:
                     resp = self._client.system_one(state=state, questions=questions)
                 self.usage["calls"] += 1
                 self._absorb_usage(resp)
-                return self._parse_answers(resp)
+                return self._parse_answers(resp, questions)
             except Exception as e:  # noqa: BLE001 — layer boundary
                 last_err = e
-                self._sleep(self._backoff * (attempt + 1))
-        raise JevError(str(last_err))
+                if attempt < self.retries:
+                    self._sleep(self._backoff * (attempt + 1))
+        raise JevError(str(last_err)) from last_err
 
     def _absorb_usage(self, resp: Any) -> None:
         u = getattr(resp, "usage", None)
@@ -1342,8 +1411,10 @@ class JevClient:
         self.usage["input_tokens"] += g("input_tokens")
         self.usage["output_tokens"] += g("output_tokens")
 
-    def _parse_answers(self, resp: Any) -> dict[str, dict]:
-        out: dict[str, dict] = {}
+    def _parse_answers(self, resp: Any, questions: dict) -> dict[str, dict]:
+        asked = {str(k) for k in questions}
+        out: dict[str, dict] = {k: {"value": None, "confidence": None, "probabilities": {}}
+                                for k in asked}
         answers = getattr(resp, "answers", None) or {}
         try:
             items = answers.items()
@@ -1351,15 +1422,23 @@ class JevClient:
             items = [(a.get("key"), a) for a in answers if isinstance(a, dict)]
         for key, ans in items:
             entry: dict = {"value": None, "confidence": None, "probabilities": {}}
+            is_noul = False
             for attr in ("noul", "score", "choice"):
                 if getattr(ans, attr, None) is not None:
                     entry["value"] = getattr(ans, attr)
+                    is_noul = attr == "noul"
                     break
             entry["confidence"] = getattr(ans, "confidence", None)
+            if is_noul and entry["confidence"] is None and entry["value"] is not None:
+                # NoulAnswer không trả confidence trên wire — suy ra từ độ cực của noul
+                entry["confidence"] = round(abs(2 * (entry["value"] - 0.5)), 4)
             probs = getattr(ans, "probabilities", None)
             if isinstance(probs, dict):
                 entry["probabilities"] = {str(k): float(v) for k, v in probs.items()}
             out[str(key)] = entry
+        missing = sorted(k for k in asked if out[k]["value"] is None)
+        if missing:
+            raise ValueError(f"SDK trả thiếu answer cho questions: {missing}")
         return out
 ```
 
