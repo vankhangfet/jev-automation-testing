@@ -1,16 +1,24 @@
 from pathlib import Path
 
-from jev_ui_agent.extract.normalize import build_state, parse_android, parse_ios
+from jev_ui_agent.extract.normalize import build_state, parse_android, parse_bounds_str, parse_ios
 from jev_ui_agent.models import StepArtifact
 
 FIX = Path(__file__).parent / "fixtures"
+
+
+def test_parse_bounds_negative_coords():
+    b = parse_bounds_str("[-315,1560][0,2400]")
+    assert (b.x1, b.y1, b.x2, b.y2) == (-315, 1560, 0, 2400)
+    b2 = parse_bounds_str("[0,-100][1080,200]")
+    assert (b2.x1, b2.y1, b2.x2, b2.y2) == (0, -100, 1080, 200)
 
 
 def test_parse_android():
     els = parse_android((FIX / "android_home.xml").read_text(encoding="utf-8"))
     labels = {e.label for e in els}
     assert "Sign in" in labels and "login.title" in labels
-    assert all(e.displayed for e in els)  # ghost bị lọc
+    assert "Hidden" not in labels  # ghost bị lọc
+    assert all(e.displayed for e in els)
     btn = next(e for e in els if e.label == "Sign in")
     assert btn.id == "com.example:id/login_btn"
     assert btn.type == "Button"
@@ -25,7 +33,9 @@ def test_parse_ios():
     assert btn.clickable
     tf = next(e for e in els if e.type == "TextField")
     assert tf.text == "demo@example.com"
-    assert all(e.displayed for e in els)  # Ghost visible=false bị lọc
+    assert "Ghost" not in {e.content_desc for e in els}  # Ghost visible=false bị lọc
+    assert all(e.id != "hidden_lbl" for e in els)
+    assert all(e.displayed for e in els)
 
 
 def test_build_state_and_find():
@@ -48,4 +58,4 @@ def test_build_state_caps_elements():
                             source_xml=(FIX / "android_home.xml").read_text(encoding="utf-8"))
     state = build_state(artifact, run_id="r", platform="android", app="a",
                         viewport={"width": 1080, "height": 2400}, max_elements=2)
-    assert len(state.elements) <= 2
+    assert len(state.elements) == 2

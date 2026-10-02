@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 
 from jev_ui_agent.models import Bounds, ScreenState, StepArtifact, UIElement
 
-_BOUNDS_RE = re.compile(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]")
+_BOUNDS_RE = re.compile(r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]")
 
 
 def parse_bounds_str(s: str) -> Bounds:
