@@ -2683,7 +2683,8 @@ git commit -m "feat: e2e smoke run on android emulator with tuned selectors"
 ## Hardening notes (từ code review các task — ghi nhớ cho task sau / Phase 2)
 
 - **Task 11**: try/except quanh checkpoint đã được mở rộng bao `build_state` (chống ET.ParseError từ page_source hỏng làm mất toàn bộ report).
-- **Phase 2 (iOS)**: `_interesting` hiện giữ container có label (Application/Window với tên app) — sẽ gây overlap false-positive trên iOS. Trước khi chạy iOS thật: loại container types hoặc cho layout check bỏ qua cặp ancestor-contained.
+- **Phase 2 (iOS)**: `_interesting` hiện giữ container có label (Application/Window với tên app) — sẽ gây nhiễu state trên iOS. Trước khi chạy iOS thật: loại container types ở extractor. (Lưu ý: phương án "layout check bỏ qua cặp ancestor-contained" KHÔNG khả thi — UIElement không có parent pointer sau khi extractor flatten cây; mitigation bằng hình học/metadata khác.)
+- **Task 5 hardening (đã áp dụng vào code sau review)**: offscreen chỉ FAIL khi ≥50% ngoài viewport (màn scroll bình thường không bị flag); overlap + truncation chỉ xét element có rendered text (`e.text`); màn không có labeled element → layout SKIPPED (không PASS ảo); expectation thiếu key/selector sai prefix → verdict ERROR thay vì crash pipeline.
 - **Phase 2**: `build_state` route mọi platform != "android" sang parse_ios — nên thêm validate platform in {"android","ios"} để fail-fast.
 - **Task 13**: nếu state quá lớn bị cap 100 elements, ghi nhận truncation (spec §7 yêu cầu cảnh báo trong report) — hiện chưa có kênh; cân nhắc thêm khi cần.
 
