@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example"
+        content-desc="" clickable="false" displayed="true" bounds="[0,0][1080,2400]">
+    <node index="0" text="" resource-id="com.example:id/header" class="android.widget.LinearLayout"
+          content-desc="" clickable="false" displayed="true" bounds="[0,100][1080,300]">
+      <node index="0" text="Welcome" resource-id="com.example:id/title" class="android.widget.TextView"
+            content-desc="" clickable="false" displayed="true" bounds="[40,150][500,250]"/>
+      <node index="1" text="login.title" resource-id="com.example:id/subtitle" class="android.widget.TextView"
+            content-desc="" clickable="false" displayed="true" bounds="[40,260][600,300]"/>
+    </node>
+    <node index="1" text="Sign in" resource-id="com.example:id/login_btn" class="android.widget.Button"
+          content-desc="" clickable="true" displayed="true" bounds="[100,800][980,880]"/>
+    <node index="2" text="" resource-id="" class="android.widget.ImageView" content-desc="Hero image"
+          clickable="false" displayed="true" bounds="[0,300][1080,780]"/>
+    <node index="3" text="Hidden" resource-id="com.example:id/ghost" class="android.widget.TextView"
+          content-desc="" clickable="false" displayed="false" bounds="[0,0][100,50]"/>
+  </node>
+</hierarchy>

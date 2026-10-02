@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<hierarchy rotation="0">
+  <node index="0" text="" resource-id="" class="android.widget.FrameLayout" package="com.example"
+        content-desc="" clickable="false" displayed="true" bounds="[0,0][1080,2400]">
+    <node index="0" text="" resource-id="com.example:id/header" class="android.widget.LinearLayout"
+          content-desc="" clickable="false" displayed="true" bounds="[0,100][1080,300]">
+      <node index="0" text="Topics" resource-id="com.example:id/title" class="android.widget.TextView"
+            content-desc="" clickable="false" displayed="true" bounds="[40,140][1040,220]"/>
+      <node index="1" text="topics.subtitle" resource-id="com.example:id/subtitle" class="android.widget.TextView"
+            content-desc="" clickable="false" displayed="true" bounds="[40,240][1040,300]"/>
+    </node>
+    <node index="1" text="" resource-id="com.example:id/topic_list" class="android.widget.LinearLayout"
+          content-desc="" clickable="false" displayed="true" bounds="[0,320][1080,1600]">
+      <node index="0" text="Topic A" resource-id="com.example:id/topic_name" class="android.widget.TextView"
+            content-desc="" clickable="false" displayed="true" bounds="[40,360][1040,440]"/>
+      <node index="1" text="Topic B" resource-id="com.example:id/topic_name" class="android.widget.TextView"
+            content-desc="" clickable="false" displayed="true" bounds="[40,480][1040,560]"/>
+      <node index="2" text="Topic C" resource-id="com.example:id/topic_name" class="android.widget.TextView"
+            content-desc="" clickable="false" displayed="true" bounds="[40,600][1040,680]"/>
+    </node>
+    <node index="2" text="Done" resource-id="com.example:id/done_btn" class="android.widget.Button"
+          content-desc="" clickable="true" displayed="true" bounds="[100,2200][980,2280]"/>
+  </node>
+</hierarchy>

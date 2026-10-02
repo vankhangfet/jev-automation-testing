@@ -1,0 +1,13 @@
+confidence_gate: 0.75
+weights: {functional: 0.35, layout: 0.20, content_quality: 0.15, error_anomaly: 0.20, visual: 0.10}
+check_toggles: {functional: true, layout: true, content_quality: true, error_anomaly: true, visual: true}
+functional_expectations:
+  - checkpoint: home
+    element: "res-id:login_btn"
+    expect_text: "Sign in"
+layout:
+  overlap_min_ratio: 0.10
+  offscreen_tolerance_px: 2
+  truncation_char_width_ratio: 0.025
+content_quality:
+  typo_pass_score: 0.75
