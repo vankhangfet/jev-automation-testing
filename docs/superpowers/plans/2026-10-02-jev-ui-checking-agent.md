@@ -2377,6 +2377,7 @@ def test_fake_run_writes_reports(tmp_path):
     )
     assert [c.checkpoint for c in report.checkpoints] == ["home", "topics", "settings"]
     assert all(c.error == "" for c in report.checkpoints)
+    assert report.checkpoints[0].screenshot == "artifacts/home.png"  # relative posix
     assert all(c.screen_score is not None for c in report.checkpoints)  # rule groups chấm được
     run_dir = tmp_path / "reports" / report.run_id
     assert (run_dir / "report.json").exists() and (run_dir / "report.html").exists()
@@ -2517,7 +2518,9 @@ def run_flow(*, flow_path: Path | str, policy_path: Path | str,
                     artifact = driver.capture(step["name"])
                     state = build_state(artifact, run_id=run_id, platform=platform,
                                         app=flow["app"], viewport=device_cfg["viewport"])
-                    cp.screenshot = state.screenshot
+                    # report dùng path tương đối posix để <img src> hoạt động;
+                    # state.screenshot (tuyệt đối) vẫn dùng cho vision bridge
+                    cp.screenshot = "artifacts/" + Path(artifact.screenshot_path).name
                     cp.results = run_checks(state, policy, jev, vision)
                     cp.screen_score = score_checkpoint(cp.results, policy.get("weights", {}))
                 except Exception as e:  # noqa: BLE001 — bao gồm ET.ParseError và policy lỗi
