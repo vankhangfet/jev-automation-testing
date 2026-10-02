@@ -1,3 +1,5 @@
+import pytest
+
 from jev_ui_agent.checks.composite import VERDICT_VALUE, apply_confidence_gate, score_checkpoint
 from jev_ui_agent.models import CheckResult, Verdict
 
@@ -45,3 +47,24 @@ def test_gate_ignores_none_confidence():
 
 def test_verdict_value_map():
     assert VERDICT_VALUE[Verdict.NEEDS_REVIEW] == 0.5
+
+
+def test_score_rejects_negative_weight():
+    with pytest.raises(ValueError):
+        score_checkpoint([r("a", Verdict.PASS)], {"a": -0.5})
+
+
+def test_gate_idempotent():
+    res = CheckResult("c", "visual", "vision+jev", Verdict.FAIL, confidence=0.6)
+    apply_confidence_gate(res, gate=0.75)
+    # Lần 2 không được ghi đè pre_gate_verdict của lần đầu
+    gated_twice = apply_confidence_gate(res, gate=0.75)
+    assert gated_twice.verdict is Verdict.NEEDS_REVIEW
+    assert gated_twice.evidence["pre_gate_verdict"] == "fail"
+
+
+def test_gate_ignores_error_and_skipped():
+    err = CheckResult("c", "visual", "vision+jev", Verdict.ERROR, confidence=0.1)
+    assert apply_confidence_gate(err, 0.75).verdict is Verdict.ERROR
+    skip = CheckResult("c", "visual", "vision+jev", Verdict.SKIPPED, confidence=0.1)
+    assert apply_confidence_gate(skip, 0.75).verdict is Verdict.SKIPPED
