@@ -45,11 +45,14 @@ class VisionBridge:
         self.calls = 0
 
     def observe(self, image_path: str) -> dict:
-        data = base64.b64encode(Path(image_path).read_bytes()).decode()
+        try:
+            data = base64.b64encode(Path(image_path).read_bytes()).decode()
+        except OSError as e:
+            raise VisionUnavailable(f"cannot read screenshot {image_path}: {e}") from e
         last_err: Exception | None = None
         for attempt in range(self.retries + 1):
+            text = ""
             try:
-                self.calls += 1
                 msg = self._client.messages.create(
                     model=self.model,
                     max_tokens=self.max_tokens,
@@ -63,10 +66,18 @@ class VisionBridge:
                         ],
                     }],
                 )
+                self.calls += 1
                 text = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text")
-                return _extract_json(text)
+                obs = _extract_json(text)
+                if not isinstance(obs, dict):
+                    raise ValueError(f"observation is not a JSON object: {text[:200]!r}")
+                return {k: obs.get(k, "none")
+                        for k in ("blank_areas", "broken_images", "text_cut", "summary")}
             except Exception as e:  # noqa: BLE001 — layer boundary
-                last_err = e
+                if text:
+                    last_err = ValueError(f"unparseable observation: {text[:200]!r}")
+                else:
+                    last_err = e
                 if attempt < self.retries:
                     time.sleep(0.5 * (attempt + 1))
         raise VisionUnavailable(str(last_err)) from last_err
