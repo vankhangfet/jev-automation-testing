@@ -1,0 +1,12 @@
+name: login_smoke
+app: com.google.samples.apps.nowinandroid
+platform: android
+steps:
+  - action: launch
+  - checkpoint: home
+  - action: tap
+    target: "acc-id:Topics"
+  - checkpoint: topics
+  - action: tap
+    target: "acc-id:Settings"
+  - checkpoint: settings

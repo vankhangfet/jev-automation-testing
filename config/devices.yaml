@@ -1,0 +1,16 @@
+android:
+  capabilities:
+    platformName: Android
+    automationName: UiAutomator2
+    deviceName: emulator-5554
+    app: ./apps/nowinandroid.apk
+    noReset: "true"
+  viewport: {width: 1080, height: 2400}
+ios:
+  capabilities:
+    platformName: iOS
+    automationName: XCUITest
+    deviceName: iPhone 16
+    platformVersion: "18.0"
+    app: ./apps/DemoApp.app
+  viewport: {width: 1170, height: 2532}
