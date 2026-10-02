@@ -2517,13 +2517,11 @@ def run_flow(*, flow_path: Path | str, policy_path: Path | str,
                     artifact = driver.capture(step["name"])
                     state = build_state(artifact, run_id=run_id, platform=platform,
                                         app=flow["app"], viewport=device_cfg["viewport"])
-                except Exception as e:  # noqa: BLE001 — bao gồm ET.ParseError từ page_source hỏng
+                    cp.screenshot = state.screenshot
+                    cp.results = run_checks(state, policy, jev, vision)
+                    cp.screen_score = score_checkpoint(cp.results, policy.get("weights", {}))
+                except Exception as e:  # noqa: BLE001 — bao gồm ET.ParseError và policy lỗi
                     cp.error = str(e)
-                    report.checkpoints.append(cp)
-                    continue
-                cp.screenshot = state.screenshot
-                cp.results = run_checks(state, policy, jev, vision)
-                cp.screen_score = score_checkpoint(cp.results, policy.get("weights", {}))
                 report.checkpoints.append(cp)
             else:
                 if not _try_action(driver, step):
