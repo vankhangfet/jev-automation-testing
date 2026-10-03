@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 import time
 from typing import Any
 
@@ -21,6 +22,7 @@ class JevClient:
         self.retries = retries
         self._backoff = backoff
         self.usage = {"calls": 0, "input_tokens": 0, "output_tokens": 0}
+        self._usage_lock = threading.Lock()
 
     def _sleep(self, seconds: float) -> None:
         time.sleep(seconds)
@@ -36,8 +38,9 @@ class JevClient:
                 except TypeError:
                     # SDK cũ không nhận kwarg model
                     resp = self._client.system_one(state=state, questions=questions)
-                self.usage["calls"] += 1
-                self._absorb_usage(resp)
+                with self._usage_lock:
+                    self.usage["calls"] += 1
+                    self._absorb_usage(resp)
                 return self._parse_answers(resp, questions)
             except Exception as e:  # noqa: BLE001 — layer boundary
                 last_err = e

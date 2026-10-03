@@ -114,3 +114,30 @@ def test_observe_normalizes_missing_keys(monkeypatch, tmp_path):
     obs = vb.observe(str(img))
     assert obs == {"blank_areas": "none", "broken_images": "none",
                    "text_cut": "none", "summary": "x"}
+
+
+def test_sniff_media_type():
+    from jev_ui_agent.vision.claude_bridge import _sniff_media_type
+    assert _sniff_media_type(b"\x89PNG\r\n\x1a\n rest") == "image/png"
+    assert _sniff_media_type(b"\xff\xd8\xff\xe0 jpeg") == "image/jpeg"
+    assert _sniff_media_type(b"garbage") == "image/png"  # default
+
+
+def test_observe_detailed_keys_and_media_type(monkeypatch, tmp_path):
+    img = tmp_path / "shot.jpg"
+    img.write_bytes(b"\xff\xd8\xff fake jpeg")
+    seen = {}
+
+    def create(**kw):
+        seen.update(kw)
+        return _msg('```json\n{"screen_type": "login", "texts": ["Sign in"]}\n```')
+
+    fake_client = SimpleNamespace(messages=SimpleNamespace(create=create))
+    monkeypatch.setattr(bridge_mod, "Anthropic", lambda *a, **kw: fake_client)
+    vb = VisionBridge()
+    obs = vb.observe_detailed(str(img))
+    assert seen["messages"][0]["content"][0]["source"]["media_type"] == "image/jpeg"
+    assert obs["screen_type"] == "login"
+    import jev_ui_agent.vision.claude_bridge as bm
+    for key in bm.OBS_DETAIL_KEYS:
+        assert key in obs  # normalize fill đủ keys

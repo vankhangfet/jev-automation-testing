@@ -113,3 +113,29 @@ def test_judge_model_kwarg_fallback(monkeypatch):
     jc._sleep = lambda s: None
     out = jc.judge("state", _QK)
     assert out["topic"]["value"] == "technical"
+
+
+_QK_THREAD = {"is_urgent": object()}  # key khớp fake answer — judge mới thành công
+
+
+def test_usage_updates_thread_safe(monkeypatch):
+    import threading
+    fake_resp_ok = SimpleNamespace(
+        answers={"is_urgent": SimpleNamespace(noul=1.0, confidence=None, probabilities=None)},
+        usage=SimpleNamespace(input_tokens=1, output_tokens=1),
+    )
+    fake = SimpleNamespace(system_one=lambda **kw: fake_resp_ok)
+    monkeypatch.setattr(client_mod, "TypeSafeClient", lambda *a, **kw: fake)
+    jc = JevClient()
+    jc._sleep = lambda s: None
+
+    def worker():
+        for _ in range(50):
+            jc.judge("state", _QK_THREAD)
+
+    threads = [threading.Thread(target=worker) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert jc.usage["calls"] == 200  # không mất cập nhật do race
