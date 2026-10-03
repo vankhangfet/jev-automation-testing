@@ -188,10 +188,11 @@ def test_checkpoint_flushed_per_image(img_dir, tmp_path):
         def observe_detailed(self, path):
             if Path(path).name == "a.png":
                 time.sleep(0.2)  # đảm bảo 3 ảnh kia hoàn thành + ghi checkpoint trước
-                raise RuntimeError("bug ngoài (VisionUnavailable, JevError)")
-            return super().observe_detailed(path)
+                # Giả lập process bị kill giữa chừng (Ctrl+C) — BaseException
+                # không nằm trong catch "record thay vì chết" của _judge_image.
+                raise KeyboardInterrupt("kill giữa chừng")
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(KeyboardInterrupt):
         run_batch(images_dir=img_dir, rules_path=_rules_file(tmp_path),
                   policy_path=FIX / "policy_test.yaml", out_root=tmp_path / "r",
                   jev=FakeJev(), vision=CrashVision())
@@ -217,6 +218,21 @@ def test_resume_missing_image_kept_in_report(img_dir, tmp_path):
     assert by_name["a.png"].results[0].evidence.get("missing") is True
     # kết quả cũ vẫn được đếm theo status cũ (report chứa cả ảnh đã mất)
     assert second.summary["passed"] == 4
+
+
+def test_unexpected_exception_records_error(img_dir, tmp_path):
+    class ExplodingJev(FakeJev):
+        def judge(self, state, questions):
+            if state["image"] == "c.jpg":
+                raise TypeError("sdk contract violation")
+            return super().judge(state, questions)
+
+    report = run_batch(images_dir=img_dir, rules_path=_rules_file(tmp_path),
+                       policy_path=FIX / "policy_test.yaml", out_root=tmp_path / "r",
+                       jev=ExplodingJev(), vision=FakeVision())
+    by_name = {cp.checkpoint: cp for cp in report.checkpoints}
+    assert "Unexpected TypeError" in by_name["c.jpg"].error
+    assert report.summary["errors"] == 1 and report.summary["passed"] == 3  # batch không chết
 
 
 def test_cp_from_record_roundtrip():

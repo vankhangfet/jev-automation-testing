@@ -66,36 +66,39 @@ def _judge_image(path: Path, rules: dict, jev: JevClient, vision: VisionBridge,
         observation = vision.observe_detailed(str(path))
         payload = {"image": path.name, "screen_observation": observation}
         answers = jev.judge(payload, build_questions(rules["rules"]))
+        results: list[CheckResult] = []
+        for rule in rules["rules"]:
+            ans = answers.get(rule["id"])
+            if ans is None:
+                results.append(CheckResult(f"rule/{rule['id']}", "rules", "vision+jev",
+                                           Verdict.ERROR, error="missing answer"))
+                continue
+            if rule["type"] == "noul":
+                satisfied = (ans.get("value") or 0.0) >= 0.5
+                r = CheckResult(f"rule/{rule['id']}", "rules", "vision+jev",
+                                Verdict.PASS if satisfied else Verdict.FAIL,
+                                confidence=ans.get("confidence"),
+                                evidence={"noul": ans.get("value"),
+                                          "instruction": rule["instruction"]})
+            else:
+                norm = (ans.get("value") or 0.0) / 4.0
+                r = CheckResult(f"rule/{rule['id']}", "rules", "vision+jev",
+                                Verdict.PASS if norm >= rule.get("pass_at", 0.75) else Verdict.FAIL,
+                                score=norm, confidence=ans.get("confidence"),
+                                evidence={"raw_score": ans.get("value"),
+                                          "instruction": rule["instruction"]})
+            results.append(apply_confidence_gate(r, gate))
+        cp.results = results
+        values = [1.0 if v is Verdict.PASS else 0.0 if v is Verdict.FAIL else 0.5
+                  for v in (r.verdict for r in results)
+                  if v in (Verdict.PASS, Verdict.FAIL, Verdict.NEEDS_REVIEW)]
+        cp.screen_score = round(sum(values) / len(values), 4) if values else None
     except (VisionUnavailable, JevError) as e:
         cp.error = f"{type(e).__name__}: {e}"
         return cp
-    results: list[CheckResult] = []
-    for rule in rules["rules"]:
-        ans = answers.get(rule["id"])
-        if ans is None:
-            results.append(CheckResult(f"rule/{rule['id']}", "rules", "vision+jev",
-                                       Verdict.ERROR, error="missing answer"))
-            continue
-        if rule["type"] == "noul":
-            satisfied = (ans.get("value") or 0.0) >= 0.5
-            r = CheckResult(f"rule/{rule['id']}", "rules", "vision+jev",
-                            Verdict.PASS if satisfied else Verdict.FAIL,
-                            confidence=ans.get("confidence"),
-                            evidence={"noul": ans.get("value"),
-                                      "instruction": rule["instruction"]})
-        else:
-            norm = (ans.get("value") or 0.0) / 4.0
-            r = CheckResult(f"rule/{rule['id']}", "rules", "vision+jev",
-                            Verdict.PASS if norm >= rule.get("pass_at", 0.75) else Verdict.FAIL,
-                            score=norm, confidence=ans.get("confidence"),
-                            evidence={"raw_score": ans.get("value"),
-                                      "instruction": rule["instruction"]})
-        results.append(apply_confidence_gate(r, gate))
-    cp.results = results
-    values = [1.0 if v is Verdict.PASS else 0.0 if v is Verdict.FAIL else 0.5
-              for v in (r.verdict for r in results)
-              if v in (Verdict.PASS, Verdict.FAIL, Verdict.NEEDS_REVIEW)]
-    cp.screen_score = round(sum(values) / len(values), 4) if values else None
+    except Exception as e:  # noqa: BLE001 — 1 ảnh hỏng không được làm chết cả batch
+        cp.error = f"Unexpected {type(e).__name__}: {e}"
+        return cp
     return cp
 
 
