@@ -59,6 +59,18 @@ def _try_action(driver: BaseDriver, step: dict, retries: int = 1) -> str | None:
     return f"{type(last_err).__name__}: {last_err}"
 
 
+def _record_failed_action(report: RunReport, driver: BaseDriver,
+                          step: dict, err: str) -> None:
+    """Ghi step fail vào report, kèm screenshot best-effort tại điểm lỗi (spec §7)."""
+    entry = f"{step['action']} {step.get('target', '')}".strip() + f": {err}"
+    try:
+        artifact = driver.capture(f"failed_{len(report.failed_steps)}")
+        entry += f" (screenshot: {artifact.screenshot_path})"
+    except Exception:  # noqa: BLE001 — capture lúc driver đang lỗi chỉ là best-effort
+        pass
+    report.failed_steps.append(entry)
+
+
 def run_flow(*, flow_path: Path | str, policy_path: Path | str,
              devices_path: Path | str, driver_kind: str, out_root: Path | str,
              fixtures_dir: Path | None = None, jev: JevClient | None = None,
@@ -105,8 +117,7 @@ def run_flow(*, flow_path: Path | str, policy_path: Path | str,
             else:
                 err = _try_action(driver, step)
                 if err is not None:
-                    report.failed_steps.append(
-                        f"{step['action']} {step.get('target', '')}".strip() + f": {err}")
+                    _record_failed_action(report, driver, step, err)
     finally:
         try:
             driver.quit()

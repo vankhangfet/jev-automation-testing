@@ -1,0 +1,39 @@
+# Policy cho demo offline với fake driver (fixtures tests/fixtures/fake_run).
+# Khác config/policy.yaml (app NIA thật): expectation bám resource-id thật của fixture.
+# Bug i18n trong fixture (login.title/topics.subtitle) không nằm trong expectation —
+# để nhóm content_quality của JEV bắt khi có TYPESAFE_API_KEY.
+confidence_gate: 0.75
+weights:
+  functional: 0.35
+  layout: 0.20
+  content_quality: 0.15
+  error_anomaly: 0.20
+  visual: 0.10
+check_toggles:
+  functional: true
+  layout: true
+  content_quality: true
+  error_anomaly: true
+  visual: true
+functional_expectations:
+  - checkpoint: home
+    element: "res-id:com.example:id/title"
+    expect_text: "Welcome"
+  - checkpoint: topics
+    element: "res-id:com.example:id/title"
+    expect_text: "Topics"
+  - checkpoint: settings
+    element: "res-id:com.example:id/title"
+    expect_text: "Settings"
+layout:
+  overlap_min_ratio: 0.10
+  offscreen_tolerance_px: 2
+  truncation_char_width_ratio: 0.025
+content_quality:
+  typo_pass_score: 0.75
+error_anomaly:
+  # screen_class rơi vào nhóm này → NEEDS_REVIEW thay vì FAIL
+  review_classes: [empty_state, loading_stuck]
+vision:
+  model: claude-haiku-4-5-20251001
+  max_calls_per_checkpoint: 1  # knob tương lai — chưa nối vào VisionBridge

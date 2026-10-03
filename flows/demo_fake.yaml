@@ -1,0 +1,15 @@
+# Flow demo offline: chạy với fake driver + fixture trong tests/fixtures/fake_run
+# (màn home/topics/settings; bug i18n "login.title", "topics.subtitle" cài sẵn
+# để JEV bắt khi có TYPESAFE_API_KEY)
+name: demo_fake
+app: com.example
+platform: android
+steps:
+  - action: launch
+  - checkpoint: home
+  - action: tap
+    target: "res-id:com.example:id/login_btn"
+  - checkpoint: topics
+  - action: tap
+    target: "res-id:com.example:id/done_btn"
+  - checkpoint: settings

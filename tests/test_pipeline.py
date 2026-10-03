@@ -78,6 +78,72 @@ def test_try_action_retries_then_records(tmp_path):
     assert err is not None and "RuntimeError" in err  # trả lý do lần thử cuối
 
 
+def _blank_report() -> "RunReport":
+    from jev_ui_agent.models import RunReport
+    return RunReport(run_id="run-x", flow_name="demo", started_at="2026-10-03T00:00:00")
+
+
+def test_record_failed_action_captures_screenshot(tmp_path):
+    from jev_ui_agent.driver.fake import FakeDriver
+    from jev_ui_agent.pipeline import _record_failed_action
+
+    out_dir = tmp_path / "reports" / "run-x"
+    driver = FakeDriver(FIX / "fake_run", out_dir)
+    driver.capture("home")  # màn hiện tại tồn tại trước khi action fail
+    report = _blank_report()
+    _record_failed_action(report, driver,
+                          {"kind": "action", "action": "tap", "target": "acc-id:Topics"},
+                          "RuntimeError: dead")
+    assert len(report.failed_steps) == 1
+    entry = report.failed_steps[0]
+    assert entry.startswith("tap acc-id:Topics: RuntimeError: dead")
+    assert "(screenshot:" in entry and ".png)" in entry
+    assert (out_dir / "artifacts" / "failed_0.png").exists()  # artifact thật trong out_dir
+
+
+def test_record_failed_action_survives_capture_error(tmp_path):
+    from jev_ui_agent.pipeline import _record_failed_action
+
+    class DeadCapture:
+        def capture(self, checkpoint):
+            raise RuntimeError("driver died")
+
+    report = _blank_report()
+    _record_failed_action(report, DeadCapture(),
+                          {"kind": "action", "action": "launch"}, "RuntimeError: boom")
+    # capture best-effort: fail capture không làm mất entry failed step
+    assert report.failed_steps == ["launch: RuntimeError: boom"]
+
+
+def test_pipeline_failed_action_wired_to_capture(tmp_path, monkeypatch):
+    import jev_ui_agent.pipeline as pipeline_module
+    from jev_ui_agent.driver.fake import FakeDriver
+
+    class TapFail(FakeDriver):
+        def tap(self, target):
+            raise RuntimeError("dead")
+
+    flow = {"name": "demo", "app": "com.example", "platform": "android", "steps": [
+        {"action": "launch"},
+        {"checkpoint": "home"},
+        {"action": "tap", "target": "acc-id:Topics"},
+        {"checkpoint": "topics"},
+    ]}
+    p = tmp_path / "flow.yaml"
+    p.write_text(yaml.safe_dump(flow), encoding="utf-8")
+
+    monkeypatch.setattr(pipeline_module, "make_driver",
+                        lambda *a, **k: TapFail(FIX / "fake_run", a[2]))
+    report = run_flow(flow_path=p, policy_path=FIX / "policy_test.yaml",
+                      devices_path=REPO_ROOT / "config" / "devices.yaml",
+                      driver_kind="fake", out_root=tmp_path / "reports",
+                      fixtures_dir=FIX / "fake_run", jev=None, vision=None)
+    assert len(report.failed_steps) == 1  # tap fail được ghi...
+    assert "RuntimeError" in report.failed_steps[0]
+    assert "(screenshot:" in report.failed_steps[0]  # ...kèm artifact tại điểm lỗi
+    assert (tmp_path / "reports" / report.run_id / "artifacts" / "failed_0.png").exists()
+
+
 def test_run_ids_unique_across_runs(tmp_path):
     flow = _flow(tmp_path)
     common = dict(policy_path=FIX / "policy_test.yaml",

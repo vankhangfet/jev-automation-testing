@@ -5,9 +5,11 @@ import os
 import sys
 from pathlib import Path
 
+import yaml
+
 from jev_ui_agent.jev.client import JevClient
 from jev_ui_agent.pipeline import run_flow
-from jev_ui_agent.vision.claude_bridge import VisionBridge
+from jev_ui_agent.vision.claude_bridge import DEFAULT_MODEL, VisionBridge
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -23,8 +25,11 @@ def main(argv: list[str] | None = None) -> int:
     run_p.add_argument("--fixtures-dir", default="tests/fixtures/fake_run")
     args = parser.parse_args(argv)
 
+    policy = yaml.safe_load(Path(args.policy).read_text(encoding="utf-8"))
+    vision_cfg = (policy.get("vision") or {}) if isinstance(policy, dict) else {}
     jev = JevClient() if os.environ.get("TYPESAFE_API_KEY") else None
-    vision = VisionBridge() if os.environ.get("ANTHROPIC_API_KEY") else None
+    vision = (VisionBridge(model=str(vision_cfg.get("model") or DEFAULT_MODEL))
+              if os.environ.get("ANTHROPIC_API_KEY") else None)
     report = run_flow(
         flow_path=args.flow, policy_path=args.policy, devices_path=args.devices,
         driver_kind=args.driver, out_root=args.out,
@@ -33,9 +38,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     failed = sum(1 for cp in report.checkpoints
                  for r in cp.results if r.verdict.value == "fail")
+    errored = sum(1 for cp in report.checkpoints if cp.error)
     print(f"Run {report.run_id}: {len(report.checkpoints)} checkpoints, {failed} failed checks")
     print(f"Report: {Path(args.out) / report.run_id / 'report.html'}")
-    return 0
+    return 1 if (failed or errored or report.failed_steps) else 0
 
 
 if __name__ == "__main__":

@@ -20,6 +20,7 @@ class FakeDriver(BaseDriver):
     def __init__(self, fixtures_dir: Path | str, out_dir: Path):
         self.fixtures_dir = Path(fixtures_dir)
         self.out_dir = Path(out_dir)
+        self._last_source: str | None = None  # màn hiện tại = fixture capture gần nhất
         (self.out_dir / "artifacts").mkdir(parents=True, exist_ok=True)
 
     def connect(self) -> None: ...
@@ -36,12 +37,17 @@ class FakeDriver(BaseDriver):
         xml_path = self.fixtures_dir / f"{checkpoint}.xml"
         if not xml_path.exists():
             xml_path = self.fixtures_dir / "default.xml"
-        if not xml_path.exists():
+        if xml_path.exists():
+            source = xml_path.read_text(encoding="utf-8")
+            self._last_source = source
+        elif self._last_source is not None:
+            # capture tại điểm lỗi (vd "failed_0"): màn hiện tại vẫn là fixture gần nhất
+            source = self._last_source
+        else:
             raise FileNotFoundError(f"Không có fixture cho checkpoint {checkpoint!r}")
         png = self.out_dir / "artifacts" / f"{checkpoint}.png"
         png.write_bytes(base64.b64decode(_PNG_B64))
         return StepArtifact(checkpoint=checkpoint, screenshot_path=str(png),
-                            source_xml=xml_path.read_text(encoding="utf-8"),
-                            activity="com.example.FakeActivity")
+                            source_xml=source, activity="com.example.FakeActivity")
 
     def quit(self) -> None: ...
