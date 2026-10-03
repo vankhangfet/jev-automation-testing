@@ -97,7 +97,7 @@ rules:
     instruction: No large blank/empty region covers more than a third of the screen
   - id: readability
     type: score
-    instruction: Text is readable: sufficient contrast, no clipping, consistent sizing
+    instruction: "Text is readable: sufficient contrast, no clipping, consistent sizing"
     criteria: [very poor, poor, acceptable, good, excellent]
     pass_at: 0.6
 ```
