@@ -82,6 +82,40 @@ uv run python -m jev_ui_agent run \
   --flow flows/login_smoke.yaml --driver android  # terminal 2
 ```
 
+## Batch screenshot checking (rules-based)
+
+Already have a folder of screenshots (from a previous run, a manual capture session, another team's dump)? `check-screenshots` judges every image against your own **natural-language rules** — no device, no UI tree, no flow file needed. Each screenshot × rule pair gets a pass/fail/needs-review verdict in a single HTML report.
+
+Write the rules in YAML — `noul` rules get a plain yes/no judgment, `score` rules get a 5-level rubric (`criteria`/`pass_at` are optional):
+
+```yaml
+name: login-screens-regression
+rules:
+  - id: no-loading-stuck
+    instruction: The screen must not be stuck on a loading spinner
+  - id: no-blank-areas
+    instruction: No large blank/empty region covers more than a third of the screen
+  - id: readability
+    type: score
+    instruction: Text is readable: sufficient contrast, no clipping, consistent sizing
+    criteria: [very poor, poor, acceptable, good, excellent]
+    pass_at: 0.6
+```
+
+Then point the agent at the folder (PNG and JPG are both supported):
+
+```bash
+uv run python -m jev_ui_agent check-screenshots \
+  --dir ./screens --rules rules.yaml \
+  [--workers 4] [--limit 50] [--no-recursive] [--resume reports/check-...]
+```
+
+How it works: each image gets **one vision call** (Claude Haiku extracts a comprehensive observation of the screen) and **one JEV call** that fans out every rule — a JEV answer with confidence below 0.75 is downgraded to `NEEDS_REVIEW`, same gate as the live pipeline.
+
+It scales to thousands of images: duplicate images are deduplicated by SHA-256, images run in parallel across `--workers`, and every result is appended to `checkpoint.jsonl` — after an interruption, `--resume <run-dir>` picks up where you left off (finished images are not re-run, errored images are retried).
+
+**Cost**: ~2,000 images ≈ $6–15 of Haiku vision calls, plus JEV (cheap). **Both `TYPESAFE_API_KEY` and `ANTHROPIC_API_KEY` are required** for this mode — the CLI exits with code `2` if either is missing (unlike `run`, there is no partial offline mode since every rule needs vision + JEV). Exit `0` = all pass, `1` = any failed check or errored image.
+
 ## Configuration
 
 | File | Purpose |

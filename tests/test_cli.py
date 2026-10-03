@@ -69,3 +69,35 @@ def test_exit_1_when_check_fails(tmp_path, capsys):
                  "--fixtures-dir", str(FIX / "fake_run")])
     assert code == 1
     assert "1 failed checks" in capsys.readouterr().out
+
+
+def test_check_screenshots_cli_requires_keys(capsys, monkeypatch, tmp_path):
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    rc = main(["check-screenshots", "--dir", str(tmp_path), "--rules", "x.yaml"])
+    assert rc == 2
+
+
+def test_check_screenshots_cli_exit_codes(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("TYPESAFE_API_KEY", "k")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+    from types import SimpleNamespace
+    import jev_ui_agent.__main__ as main_mod
+
+    def fake_batch_fail(**kw):
+        return SimpleNamespace(run_id="check-x",
+                               summary={"total_images": 3, "passed": 2, "failed": 1,
+                                        "needs_review": 0, "errors": 0},
+                               checkpoints=[], costs={})
+
+    monkeypatch.setattr(main_mod, "run_batch", fake_batch_fail)
+    assert main(["check-screenshots", "--dir", str(tmp_path), "--rules", "r.yaml"]) == 1
+
+    def fake_batch_pass(**kw):
+        return SimpleNamespace(run_id="check-y",
+                               summary={"total_images": 3, "passed": 3, "failed": 0,
+                                        "needs_review": 0, "errors": 0},
+                               checkpoints=[], costs={})
+
+    monkeypatch.setattr(main_mod, "run_batch", fake_batch_pass)
+    assert main(["check-screenshots", "--dir", str(tmp_path), "--rules", "r.yaml"]) == 0
