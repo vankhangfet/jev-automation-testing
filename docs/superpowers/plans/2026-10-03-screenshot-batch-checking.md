@@ -892,4 +892,6 @@ def test_check_screenshots_cli_exit_codes(monkeypatch, tmp_path, capsys):
 ## Ghi chú thực thi
 
 - Task 2 refactor `observe()` → `_observe()` phải giữ nguyên behavior của 97 tests Phase 1 (không đổi test cũ).
+- Task 4 review fix (ngoài plan ban đầu): checkpoint append+flush sau MỖI ảnh (spec luồng [4]e) thay vì ghi batch cuối pool; dòng checkpoint hỏng/cắt cụt (kill giữa lúc write) được bỏ qua khi resume; ảnh bị xoá khỏi folder khi resume được giữ trong report với evidence `missing: true` + summary key `missing` (spec "ghi nhận missing"). Task 5 nên thêm "Missing" vào Batch summary table (hiển thị khi > 0).
+- Task 6: `run_batch` mặc định `recursive=True` (deviation đã duyệt, khớp test 4 ảnh gồm `sub/d`). CLI phải khớp mặc định này — dùng `argparse.BooleanOptionalAction` (`--recursive`/`--no-recursive`, `default=True`) thay vì `store_true`, vì store_true default False sẽ âm thầm đổi behavior so với thư viện; README ghi rõ `--no-recursive` = chỉ quét tầng đầu.
 - Attribution: mỗi commit kết thúc bằng `Co-Authored-By: Claude Code <noreply@anthropic.com>`.

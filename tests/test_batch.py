@@ -164,6 +164,61 @@ def test_resume_skips_done_and_retries_errors(img_dir, tmp_path):
     assert jev2.usage["calls"] == 1  # chỉ retry a.png; b/c/d dùng lại checkpoint done
 
 
+def test_resume_tolerates_corrupt_checkpoint_lines(img_dir, tmp_path):
+    first = run_batch(images_dir=img_dir, rules_path=_rules_file(tmp_path),
+                      policy_path=FIX / "policy_test.yaml", out_root=tmp_path / "r",
+                      jev=FakeJev(), vision=FakeVision())
+    ckpt = tmp_path / "r" / first.run_id / "checkpoint.jsonl"
+    lines = ckpt.read_text(encoding="utf-8").splitlines()
+    # kill giữa chừng: dòng cuối bị cắt cụt (không newline), + 1 dòng garbage
+    ckpt.write_text("not json at all\n" + "\n".join(lines[:-1]) + "\n"
+                    + lines[-1][: len(lines[-1]) // 2], encoding="utf-8")
+    jev2 = FakeJev()
+    second = run_batch(images_dir=img_dir, rules_path=_rules_file(tmp_path),
+                       policy_path=FIX / "policy_test.yaml", out_root=tmp_path / "r",
+                       resume_dir=tmp_path / "r" / first.run_id, jev=jev2, vision=FakeVision())
+    assert jev2.usage["calls"] == 1  # chỉ ảnh của dòng cắt cụt được chạy lại
+    assert second.summary["passed"] == 4
+
+
+def test_checkpoint_flushed_per_image(img_dir, tmp_path):
+    import time
+
+    class CrashVision(FakeVision):
+        def observe_detailed(self, path):
+            if Path(path).name == "a.png":
+                time.sleep(0.2)  # đảm bảo 3 ảnh kia hoàn thành + ghi checkpoint trước
+                raise RuntimeError("bug ngoài (VisionUnavailable, JevError)")
+            return super().observe_detailed(path)
+
+    with pytest.raises(RuntimeError):
+        run_batch(images_dir=img_dir, rules_path=_rules_file(tmp_path),
+                  policy_path=FIX / "policy_test.yaml", out_root=tmp_path / "r",
+                  jev=FakeJev(), vision=CrashVision())
+    run_dir = next((tmp_path / "r").iterdir())
+    lines = (run_dir / "checkpoint.jsonl").read_text(encoding="utf-8").splitlines()
+    # kill/crash giữa chừng KHÔNG mất kết quả các ảnh đã xong
+    assert len(lines) == 3 and all(json.loads(l)["status"] == "done" for l in lines)
+
+
+def test_resume_missing_image_kept_in_report(img_dir, tmp_path):
+    first = run_batch(images_dir=img_dir, rules_path=_rules_file(tmp_path),
+                      policy_path=FIX / "policy_test.yaml", out_root=tmp_path / "r",
+                      jev=FakeJev(), vision=FakeVision())
+    (img_dir / "a.png").unlink()  # ảnh bị xoá khỏi folder trước khi resume
+    jev2 = FakeJev()
+    second = run_batch(images_dir=img_dir, rules_path=_rules_file(tmp_path),
+                       policy_path=FIX / "policy_test.yaml", out_root=tmp_path / "r",
+                       resume_dir=tmp_path / "r" / first.run_id, jev=jev2, vision=FakeVision())
+    assert second.summary["total_images"] == 3
+    assert second.summary["missing"] == 1
+    assert jev2.usage["calls"] == 0  # 3 ảnh còn lại đều done trong checkpoint
+    by_name = {cp.checkpoint: cp for cp in second.checkpoints}
+    assert by_name["a.png"].results[0].evidence.get("missing") is True
+    # kết quả cũ vẫn được đếm theo status cũ (report chứa cả ảnh đã mất)
+    assert second.summary["passed"] == 4
+
+
 def test_cp_from_record_roundtrip():
     rec = {"image": "x.png", "hash": "h", "status": "done",
            "report": {"checkpoint": "x.png", "screen_score": 1.0, "screenshot": "x.png",

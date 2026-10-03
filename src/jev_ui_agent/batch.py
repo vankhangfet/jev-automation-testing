@@ -135,11 +135,17 @@ def run_batch(*, images_dir, rules_path, policy_path, out_root, workers: int = 4
 
     done_by_hash: dict[str, dict] = {}
     if ckpt_path.exists():
-        for line in ckpt_path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
+        # errors="replace": kill giữa chừng có thể cắt cụt cả chuỗi UTF-8 ở dòng cuối
+        for line in ckpt_path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if not line.strip():
+                continue
+            try:
                 rec = json.loads(line)
                 if rec.get("status") == "done":
                     done_by_hash[rec["hash"]] = rec  # dòng sau đè dòng trước
+            except (ValueError, AttributeError, KeyError, TypeError):
+                # dòng hỏng/cắt cụt (kill giữa lúc write) — bỏ qua, ảnh đó sẽ được chạy lại
+                continue
 
     unique: dict[str, Path] = {}
     for p in images:
@@ -147,20 +153,21 @@ def run_batch(*, images_dir, rules_path, policy_path, out_root, workers: int = 4
 
     pending = [p for h, p in unique.items() if h not in done_by_hash]
     new_cps: dict[str, CheckpointReport] = {}
-    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
-        futures = {pool.submit(_judge_image, p, rules, jev, vision, gate): p for p in pending}
-        for fut in as_completed(futures):
-            p = futures[fut]
-            new_cps[hashes[p]] = fut.result()
-
+    # Append + flush ngay sau MỖI ảnh (spec luồng [4]e): kill giữa chừng chỉ mất
+    # ảnh chưa xong — mọi ảnh đã xong đã nằm sẵn trong checkpoint.
     with open(ckpt_path, "a", encoding="utf-8") as ckpt:
-        for h, p in unique.items():
-            if h in new_cps:
-                rec = {"image": str(p), "hash": h,
-                       "status": "error" if new_cps[h].error else "done",
-                       "report": asdict(new_cps[h])}
+        with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+            futures = {pool.submit(_judge_image, p, rules, jev, vision, gate): p
+                       for p in pending}
+            for fut in as_completed(futures):
+                p = futures[fut]
+                cp = fut.result()
+                new_cps[hashes[p]] = cp
+                rec = {"image": str(p), "hash": hashes[p],
+                       "status": "error" if cp.error else "done",
+                       "report": asdict(cp)}
                 ckpt.write(json.dumps(rec, default=str, ensure_ascii=False) + "\n")
-        ckpt.flush()
+                ckpt.flush()
 
     cps: list[CheckpointReport] = []
     seen_hash: dict[str, str] = {}
@@ -183,9 +190,22 @@ def run_batch(*, images_dir, rules_path, policy_path, out_root, workers: int = 4
             seen_hash[h] = p.name
             cps.append(new_cps[h] if h in new_cps else _cp_from_record(done_by_hash[h]))
 
+    # Ảnh bị xoá/không còn trong folder khi resume: giữ kết quả cũ trong report,
+    # đánh dấu missing (spec: "ghi nhận missing") — không chạy lại, không mất kết quả.
+    missing = 0
+    for h, rec in done_by_hash.items():
+        if h in unique:  # hash vẫn còn trong folder (unique keyed theo hash)
+            continue
+        cp = _cp_from_record(rec)
+        if cp.results:
+            cp.results[0].evidence = dict(cp.results[0].evidence, missing=True)
+        cps.append(cp)
+        missing += 1
+
     counts = _status_counts(cps)
     counts["duplicates"] = duplicates
     counts["total_images"] = len(images)
+    counts["missing"] = missing
     counts["rules"] = len(rules["rules"])
 
     report = RunReport(run_id=run_id, flow_name=f"rules:{rules['name']}",
