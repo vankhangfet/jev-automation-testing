@@ -2,58 +2,60 @@
 
 ![Tests](https://img.shields.io/badge/tests-97%2F97%20passing-brightgreen) ![Python](https://img.shields.io/badge/python-3.12-blue) ![Driver](https://img.shields.io/badge/platform-Android%20%7C%20Fake-orange)
 
-**Agent kiểm tra UI mobile dùng [JEV](https://docs.typesafe.ai/) (judgment engine của TypeSafe) làm bộ não phán đoán.**
+**A mobile UI testing agent that uses [JEV](https://docs.typesafe.ai/) (TypeSafe's judgment engine) as its decision-making brain.**
 
-Thay vì chỉ so khớp selector cứng nhắc, JEV chấm điểm từng màn hình theo rubric có cấu trúc (content quality, error/anomaly…) kèm **confidence** và **probabilities** — kết quả là báo cáo test mà con người đọc được *lý do* đằng sau mỗi pass/fail, không chỉ con số xanh đỏ.
+Instead of relying only on rigid selector matching, JEV scores each screen against structured rubrics (content quality, error/anomaly classification, …) and returns **confidence** and **probability distributions** — producing test reports where humans can read the *reasoning* behind every pass/fail, not just red and green marks.
 
-Triết lý **"code in control"** (theo khuyến cáo chính thức của TypeSafe): agent là một pipeline deterministic, không có LLM tự quyết định bước tiếp theo. Mọi phán đoán đều nguyên tử (atomic), có evidence trong report, và có thể chạy lại 100% giống nhau.
+The design follows the **"code in control"** philosophy (TypeSafe's official recommendation): the agent is a deterministic pipeline, no LLM decides the next step. Every judgment is atomic, backed by evidence in the report, and 100% reproducible across runs.
 
-## Kiến trúc
+## Architecture
 
 ```
 Mobile App → UI Automation (Appium/Fake) → Screenshot + UI Tree
                                                     ↓
                               ┌─────────────────────┴─────────────────────┐
                               │            Hybrid Check Router            │
-                              │  "mỗi check đi con đường rẻ nhất có thể"  │
+                              │   "each check takes the cheapest path     │
+                              │              that can answer it"          │
                               ├───────────────────────────────────────────┤
-                              │ 1. RULE (code thuần, 0đ AI)               │
-                              │    element tồn tại, overlap, off-screen   │
-                              │ 2. JEV (1 call fan-out / checkpoint)      │
-                              │    i18n key thô, typo, phân loại màn hình │
-                              │ 3. VISION + JEV (đắt nhất, chỉ khi cần)   │
-                              │    Claude trích observation → JEV phán    │
+                              │ 1. RULES (plain code, zero AI cost)       │
+                              │    element presence, overlap, off-screen  │
+                              │ 2. JEV (one fan-out call / checkpoint)    │
+                              │    raw i18n keys, typos, screen class     │
+                              │ 3. VISION + JEV (most expensive, on demand)│
+                              │    Claude extracts observation → JEV      │
+                              │    renders the verdict                    │
                               └─────────────────────┬─────────────────────┘
                                                     ↓
                        Composite scoring + Confidence gate (0.75)
                                                     ↓
-                       Report HTML/JSON + Cost log (JEV tokens, vision calls)
+                       HTML/JSON report + Cost log (JEV tokens, vision calls)
 ```
 
-## 5 nhóm kiểm tra
+## The 5 check groups
 
-| Nhóm | Đường đi | Ví dụ |
+| Group | Path | Examples |
 |---|---|---|
-| **Functional** | rule + JEV | element tồn tại, text đúng, placeholder "Lorem ipsum"? |
-| **Layout heuristics** | rule | overlap che khuất, tràn màn hình, ứng cử viên cắt chữ |
-| **Content quality** | JEV trực tiếp | i18n key thô (`login.title`), TODO/FIXME, chấm điểm typo theo rubric 5 mức |
-| **Error/anomaly** | JEV trực tiếp | phân loại màn: normal / error_screen / crash_dialog / empty_state / loading_stuck |
-| **Visual** | vision → JEV | màn trống, ảnh broken, chữ bị cắt (qua observation JSON của Claude Haiku) |
+| **Functional** | rules + JEV | element exists, text matches, placeholder "Lorem ipsum"? |
+| **Layout heuristics** | rules | occluding overlap, off-screen overflow, truncation candidates |
+| **Content quality** | JEV direct | raw i18n keys (`login.title`), TODO/FIXME leftovers, typo severity on a 5-level rubric |
+| **Error/anomaly** | JEV direct | screen classification: normal / error_screen / crash_dialog / empty_state / loading_stuck |
+| **Visual** | vision → JEV | blank screens, broken images, clipped text (via a structured Claude Haiku observation) |
 
-**Confidence gate**: kết quả có confidence < 0.75 bị hạ xuống `NEEDS_REVIEW` thay vì pass/fail sai — lớp chống false-positive chính của hệ thống. `loading_stuck`/`empty_state` cũng chỉ ra `NEEDS_REVIEW` vì snapshot tĩnh không chứng minh được đó là bug.
+**Confidence gate**: any result with confidence below 0.75 is downgraded to `NEEDS_REVIEW` instead of a wrong pass/fail — the system's primary false-positive defense. `loading_stuck` and `empty_state` classifications also map to `NEEDS_REVIEW`, because a static snapshot cannot prove they are actual bugs.
 
-## Bắt đầu
+## Getting started
 
 ```bash
 git clone https://github.com/vankhangfet/jev-automation-testing.git
 cd jev-automation-testing
-uv sync          # Python 3.12 (pin sẵn qua .python-version)
-uv run pytest    # 97 tests — hoàn toàn offline, không cần thiết bị hay API key
+uv sync          # Python 3.12 (pinned via .python-version)
+uv run pytest    # 97 tests — fully offline, no device or API key required
 ```
 
-## Demo offline (60 giây, không cần gì thêm)
+## Offline demo (60 seconds, nothing else needed)
 
-Fake driver chạy trên UI tree XML dựng sẵn (`tests/fixtures/fake_run/` — 3 màn hình, có cài sẵn bug i18n `login.title` để chứng minh agent phát hiện được):
+The fake driver runs against pre-built UI tree XML fixtures (`tests/fixtures/fake_run/` — three screens, one with a deliberately planted `login.title` i18n bug to prove the agent catches it):
 
 ```bash
 uv run python -m jev_ui_agent run --flow flows/demo_fake.yaml \
@@ -61,81 +63,81 @@ uv run python -m jev_ui_agent run --flow flows/demo_fake.yaml \
   --fixtures-dir tests/fixtures/fake_run
 ```
 
-Kết quả:
+Output:
 
 ```
 Run run-20261003-085216: 3 checkpoints, 0 failed checks
 Report: reports\run-20261003-085216\report.html
 ```
 
-Mở `reports/run-*/report.html`: mỗi checkpoint có screenshot, bảng checks (verdict / score / confidence), tổng điểm màn hình theo trọng số, và bảng chi phí (số call JEV/vision + token). Exit code `0` = pass hết, `1` = có failed check/errored checkpoint/failed step — dùng được cho CI ngay.
+Open `reports/run-*/report.html`: each checkpoint shows its screenshot, the checks table (verdict / score / confidence), the weighted screen score, and a cost table (JEV/vision calls + tokens). Exit code `0` = all green, `1` = failed check / errored checkpoint / failed step — CI-ready out of the box.
 
-## Chạy thật trên Android (Appium)
+## Running on a real Android device (Appium)
 
-Hạ tầng driver Appium UiAutomator2 đã sẵn sàng. Xem runbook đầy đủ tại [`scripts/setup_android.md`](scripts/setup_android.md) (Appium server, emulator, build APK Now in Android — *lưu ý: repo NIA không publish APK trong Releases, phải build từ nguồn hoặc cài từ Play Store*), rồi:
+The Appium UiAutomator2 driver is fully wired. Follow the runbook at [`scripts/setup_android.md`](scripts/setup_android.md) (Appium server, emulator, building the Now in Android APK — *note: the NIA repo does not publish APKs in its Releases; build from source or install from the Play Store*), then:
 
 ```bash
-appium &                                        # terminal 1 — server 127.0.0.1:4723
+appium &                                          # terminal 1 — server at 127.0.0.1:4723
 uv run python -m jev_ui_agent run \
   --flow flows/login_smoke.yaml --driver android  # terminal 2
 ```
 
-## Cấu hình
+## Configuration
 
-| File | Vai trò |
+| File | Purpose |
 |---|---|
-| `flows/*.yaml` | kịch bản test: action (launch/tap/input/swipe) + checkpoint (nơi capture & phân tích) |
-| `config/policy.yaml` | trọng số composite, ngưỡng confidence, bật/tắt nhóm check, kỳ vọng functional (bản cho app NIA thật) |
-| `config/policy.fake.yaml` | bản cho demo offline |
-| `config/devices.yaml` | Appium capabilities + viewport mỗi nền tảng (Android/iOS) |
-| `src/jev_ui_agent/jev/questions.py` | question bank JEV — **một file duy nhất** để người review đọc/điều chỉnh câu hỏi (best practice TypeSafe) |
+| `flows/*.yaml` | test scenarios: actions (launch/tap/input/swipe) + checkpoints (where the agent captures & analyzes) |
+| `config/policy.yaml` | composite weights, confidence gate, per-group toggles, functional expectations (tuned for the real NIA app) |
+| `config/policy.fake.yaml` | same, for the offline demo |
+| `config/devices.yaml` | Appium capabilities + viewport per platform (Android/iOS) |
+| `src/jev_ui_agent/jev/questions.py` | the JEV question bank — a **single file** humans can read and tune (a TypeSafe best practice) |
 
-### Biến môi trường
+### Environment variables
 
-Đọc từ shell (không tự load `.env`; xem mẫu `.env.example`):
+Read from the shell (no automatic `.env` loading; see `.env.example`):
 
-- `TYPESAFE_API_KEY` — từ [console.typesafe.ai](https://console.typesafe.ai/keys). Thiếu → check JEV tự `SKIPPED`.
-- `ANTHROPIC_API_KEY` — cho vision bridge. Thiếu → check visual tự `SKIPPED`.
+- `TYPESAFE_API_KEY` — from [console.typesafe.ai](https://console.typesafe.ai/keys). Missing → JEV checks are automatically `SKIPPED`.
+- `ANTHROPIC_API_KEY` — for the vision bridge. Missing → visual checks are automatically `SKIPPED`.
 
-## Cấu trúc project
+## Project layout
 
 ```
 src/jev_ui_agent/
 ├── __main__.py        # CLI: run --flow ... --driver fake|android
 ├── pipeline.py        # orchestrator: flow → capture → checks → report
 ├── driver/            # BaseDriver + FakeDriver + AndroidDriver (Appium)
-├── extract/           # UI tree XML → ScreenState chuẩn hóa (Android + iOS)
-├── checks/            # rule checks, router (rule→JEV→vision), composite score
-├── jev/               # JEV client (retry/usage) + question bank
+├── extract/           # UI tree XML → normalized ScreenState (Android + iOS)
+├── checks/            # rule checks, router (rules→JEV→vision), composite score
+├── jev/               # JEV client (retry/usage tracking) + question bank
 ├── vision/            # Claude Haiku bridge (screenshot → observation JSON)
-└── report/            # JSON + HTML renderer
+└── report/            # JSON + HTML renderers
 config/                # policy, devices, policy.fake
-flows/                 # flow test YAML
-tests/                 # 97 tests + fixtures (UI tree XML 2 nền tảng)
-docs/superpowers/      # design spec + implementation plan (13 task, TDD)
-scripts/               # setup_android.md (runbook E2E), verify_typesafe_sdk.py
+flows/                 # test flow YAML files
+tests/                 # 97 tests + fixtures (UI tree XML for both platforms)
+docs/superpowers/      # design spec + implementation plan (13 TDD tasks)
+scripts/               # setup_android.md (E2E runbook), verify_typesafe_sdk.py
 ```
 
 ## Tech stack
 
-| Thành phần | Công nghệ |
+| Component | Technology |
 |---|---|
-| Ngôn ngữ | Python 3.12 (uv) |
+| Language | Python 3.12 (uv) |
 | Judgment engine | JEV `jev-latest` ([typesafe-sdk](https://docs.typesafe.ai/)) |
 | Vision bridge | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) |
 | UI automation | Appium 2 (`appium-python-client` 6.x, UiAutomator2) |
-| Test | pytest — 97 tests, mock toàn bộ API boundary |
+| Testing | pytest — 97 tests, every API boundary mocked |
 
-## Lộ trình
+## Roadmap
 
-- ✅ **Phase 1**: pipeline hybrid đầy đủ (rule + JEV + vision), report HTML/JSON + cost, fake driver demo, hạ tầng Appium Android, 97 tests offline
-- 🔜 **Phase 2**: driver iOS (XCUITest) — extractor đã hỗ trợ XCUI tree; so sánh implementation với **Figma design** (Figma API → JSON → JEV đối chiếu UI tree)
-- 🔮 **Phase 3**: chế độ exploratory (agent tự khám phá app)
+- ✅ **Phase 1**: full hybrid pipeline (rules + JEV + vision), HTML/JSON reports with cost tracking, fake-driver demo, Appium Android infrastructure, 97 offline tests
+- 🔜 **Phase 2**: iOS driver (XCUITest) — the extractor already parses XCUI trees; **Figma design comparison** (Figma API → JSON → JEV cross-checked against the UI tree)
+- 🔮 **Phase 3**: exploratory mode (the agent explores the app on its own)
 
-Chi tiết kỹ thuật và các rủi ro đã ghi nhận (iOS nested coordinates, container noise…) nằm trong hardening notes cuối [`docs/superpowers/plans/2026-10-02-jev-ui-checking-agent.md`](docs/superpowers/plans/2026-10-02-jev-ui-checking-agent.md).
+Technical details and known risks (iOS nested coordinates, container noise, …) are recorded in the hardening notes at the end of [`docs/superpowers/plans/2026-10-02-jev-ui-checking-agent.md`](docs/superpowers/plans/2026-10-02-jev-ui-checking-agent.md).
 
-## Tài liệu
+## Documentation
 
-- [Design spec](docs/superpowers/specs/2026-10-02-jev-ui-checking-agent-design.md) — quyết định kiến trúc & ràng buộc nền tảng JEV
-- [Implementation plan](docs/superpowers/plans/2026-10-02-jev-ui-checking-agent.md) — 13 task TDD kèm hardening notes
-- [Runbook E2E Android](scripts/setup_android.md)
+- [Design spec](docs/superpowers/specs/2026-10-02-jev-ui-checking-agent-design.md) — architecture decisions & JEV platform constraints
+- [Implementation plan](docs/superpowers/plans/2026-10-02-jev-ui-checking-agent.md) — 13 TDD tasks with hardening notes
+- [Android E2E runbook](scripts/setup_android.md)
