@@ -5,12 +5,10 @@ import os
 import sys
 from pathlib import Path
 
-import yaml
-
 from jev_ui_agent.batch import run_batch
 from jev_ui_agent.jev.client import JevClient
 from jev_ui_agent.pipeline import run_flow
-from jev_ui_agent.vision.claude_bridge import DEFAULT_MODEL, VisionBridge
+from jev_ui_agent.vision import make_vision_bridge
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -38,11 +36,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "run":
-        policy = yaml.safe_load(Path(args.policy).read_text(encoding="utf-8"))
-        vision_cfg = (policy.get("vision") or {}) if isinstance(policy, dict) else {}
         jev = JevClient() if os.environ.get("TYPESAFE_API_KEY") else None
-        vision = (VisionBridge(model=str(vision_cfg.get("model") or DEFAULT_MODEL))
-                  if os.environ.get("ANTHROPIC_API_KEY") else None)
+        vision = make_vision_bridge()  # None khi không có nguồn vision nào
         report = run_flow(
             flow_path=args.flow, policy_path=args.policy, devices_path=args.devices,
             driver_kind=args.driver, out_root=args.out,
@@ -57,9 +52,16 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if (failed or errored or report.failed_steps) else 0
 
     if args.command == "check-screenshots":
-        if not (os.environ.get("TYPESAFE_API_KEY") and os.environ.get("ANTHROPIC_API_KEY")):
-            print("check-screenshots requires both TYPESAFE_API_KEY and ANTHROPIC_API_KEY "
-                  "(every rule goes through vision + JEV).", file=sys.stderr)
+        has_vision = bool((os.environ.get("LLM_URL") and os.environ.get("MODEL_NAME"))
+                          or os.environ.get("ANTHROPIC_API_KEY"))
+        if not has_vision:
+            print("check-screenshots requires a vision source: set LLM_URL + MODEL_NAME "
+                  "(optionally LLM_API_KEY) or ANTHROPIC_API_KEY.", file=sys.stderr)
+            return 2
+        jev = JevClient() if os.environ.get("TYPESAFE_API_KEY") else None
+        if jev is None:
+            print("check-screenshots also requires TYPESAFE_API_KEY for rule judgments.",
+                  file=sys.stderr)
             return 2
         rules_preview = None
         try:
@@ -71,8 +73,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"WARNING: {len(rules_preview['rules'])} rules trong 1 fan-out call — "
                   "JEV trả thiếu 1 answer sẽ làm mất cả bộ; cân nhắc tách rules file.",
                   file=sys.stderr)
-        jev = JevClient()
-        vision = VisionBridge(max_tokens=2048)  # observation chi tiết cần headroom
+        vision = make_vision_bridge()  # max_tokens=2048 mặc định — observation cần headroom
         report = run_batch(images_dir=args.dir, rules_path=args.rules,
                            policy_path=args.policy, out_root=args.out,
                            workers=max(1, args.workers), limit=args.limit,

@@ -14,6 +14,10 @@ def _no_api_keys(monkeypatch):
     """CLI test chạy offline: không key → JEV/vision client là None."""
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_URL", raising=False)
+    monkeypatch.delenv("MODEL_NAME", raising=False)
+    monkeypatch.delenv("LLM_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_STYLE", raising=False)
 
 
 def _flow(tmp_path: Path, checkpoints: tuple[str, ...]) -> Path:
@@ -101,3 +105,62 @@ def test_check_screenshots_cli_exit_codes(monkeypatch, tmp_path, capsys):
 
     monkeypatch.setattr(main_mod, "run_batch", fake_batch_pass)
     assert main(["check-screenshots", "--dir", str(tmp_path), "--rules", "r.yaml"]) == 0
+
+
+def test_check_screenshots_accepts_llm_env(monkeypatch, tmp_path):
+    """LLM_URL+MODEL_NAME là nguồn vision hợp lệ — không cần ANTHROPIC_API_KEY."""
+    from types import SimpleNamespace
+    import jev_ui_agent.__main__ as main_mod
+
+    monkeypatch.setenv("TYPESAFE_API_KEY", "k")
+    monkeypatch.setenv("LLM_URL", "http://localhost:11434/v1")
+    monkeypatch.setenv("MODEL_NAME", "qwen2.5-vl")
+
+    def fake_batch(**kw):
+        assert kw["vision"] is not None  # factory tạo được bridge từ LLM_* env
+        return SimpleNamespace(run_id="check-z",
+                               summary={"total_images": 1, "passed": 1, "failed": 0,
+                                        "needs_review": 0, "errors": 0},
+                               checkpoints=[], costs={})
+
+    monkeypatch.setattr(main_mod, "run_batch", fake_batch)
+    assert main(["check-screenshots", "--dir", str(tmp_path), "--rules", "r.yaml"]) == 0
+
+
+def test_check_screenshots_rejects_when_no_vision_source(monkeypatch, tmp_path, capsys):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("LLM_URL", raising=False)
+    monkeypatch.delenv("MODEL_NAME", raising=False)
+    rc = main(["check-screenshots", "--dir", str(tmp_path), "--rules", "x.yaml"])
+    assert rc == 2
+    out = capsys.readouterr().err
+    assert "LLM_URL" in out or "ANTHROPIC_API_KEY" in out
+
+
+def test_run_uses_vision_factory(monkeypatch, tmp_path):
+    """run branch cũng qua factory: chỉ LLM_* env (không Anthropic key) vẫn có vision."""
+    import jev_ui_agent.__main__ as main_mod
+    from jev_ui_agent.models import RunReport
+
+    flow = {"name": "demo", "app": "com.example", "platform": "android", "steps": [
+        {"checkpoint": "home"}]}
+    fp = tmp_path / "f.yaml"
+    fp.write_text(yaml.safe_dump(flow), encoding="utf-8")
+
+    monkeypatch.setenv("LLM_URL", "http://localhost:11434/v1")
+    monkeypatch.setenv("MODEL_NAME", "qwen2.5-vl")
+
+    seen = {}
+
+    def fake_run_flow(**kw):
+        seen.update(kw)
+        return RunReport(run_id="run-x", flow_name="demo", started_at="t")
+
+    monkeypatch.setattr(main_mod, "run_flow", fake_run_flow)
+    rc = main(["run", "--flow", str(fp), "--driver", "fake",
+               "--policy", str(REPO_ROOT / "config" / "policy.fake.yaml"),
+               "--devices", str(REPO_ROOT / "config" / "devices.yaml"),
+               "--out", str(tmp_path / "r"),
+               "--fixtures-dir", str(FIX / "fake_run")])
+    assert rc == 0
+    assert seen["vision"] is not None and seen["jev"] is None

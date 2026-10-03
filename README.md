@@ -110,11 +110,11 @@ uv run python -m jev_ui_agent check-screenshots \
   [--workers 4] [--limit 50] [--no-recursive] [--resume reports/check-...]
 ```
 
-How it works: each image gets **one vision call** (Claude Haiku extracts a comprehensive observation of the screen) and **one JEV call** that fans out every rule — a JEV answer with confidence below 0.75 is downgraded to `NEEDS_REVIEW`, same gate as the live pipeline.
+How it works: each image gets **one vision call** (the vision model extracts a comprehensive observation of the screen) and **one JEV call** that fans out every rule — a JEV answer with confidence below 0.75 is downgraded to `NEEDS_REVIEW`, same gate as the live pipeline.
 
 It scales to thousands of images: duplicate images are deduplicated by SHA-256, images run in parallel across `--workers`, and every result is appended to `checkpoint.jsonl` — after an interruption, `--resume <run-dir>` picks up where you left off (finished images are not re-run, errored images are retried).
 
-**Cost**: ~2,000 images ≈ $6–15 of Haiku vision calls, plus JEV (cheap). **Both `TYPESAFE_API_KEY` and `ANTHROPIC_API_KEY` are required** for this mode — the CLI exits with code `2` if either is missing (unlike `run`, there is no partial offline mode since every rule needs vision + JEV). Exit `0` = all pass, `1` = any failed check or errored image.
+**Cost**: ~2,000 images ≈ $6–15 of Haiku vision calls (other models vary), plus JEV (cheap). This mode requires a vision source — `LLM_URL` + `MODEL_NAME` **or** `ANTHROPIC_API_KEY` — **and** `TYPESAFE_API_KEY`; the CLI exits with code `2` if a source is missing (unlike `run`, there is no partial offline mode since every rule needs vision + JEV). Exit `0` = all pass, `1` = any failed check or errored image.
 
 ## Configuration
 
@@ -130,8 +130,38 @@ It scales to thousands of images: duplicate images are deduplicated by SHA-256, 
 
 Read from the shell (no automatic `.env` loading; see `.env.example`):
 
-- `TYPESAFE_API_KEY` — from [console.typesafe.ai](https://console.typesafe.ai/keys). Missing → JEV checks are automatically `SKIPPED`.
-- `ANTHROPIC_API_KEY` — for the vision bridge. Missing → visual checks are automatically `SKIPPED`.
+| Variable | Purpose |
+|---|---|
+| `TYPESAFE_API_KEY` | JEV judgment engine — from [console.typesafe.ai](https://console.typesafe.ai/keys). Missing → JEV checks are automatically `SKIPPED`. |
+| `LLM_URL` | Base URL of any OpenAI- or Anthropic-style vision endpoint, e.g. `http://localhost:11434/v1` (Ollama) or `https://openrouter.ai/api/v1`. |
+| `MODEL_NAME` | Vision model at that endpoint, e.g. `qwen2.5-vl`, `gpt-4o-mini`, `claude-haiku-4-5`. |
+| `LLM_API_KEY` | Optional API key for `LLM_URL` — local servers (Ollama/vLLM) need none; hosted gateways do. |
+| `LLM_STYLE` | Optional protocol hint: `openai` \| `anthropic`. Auto-detected from the URL by default (contains `/v1/messages` → anthropic). |
+| `ANTHROPIC_API_KEY` | Fallback vision source: the Anthropic SDK with pinned Claude Haiku. |
+
+**Vision source priority**: `LLM_URL` + `MODEL_NAME` (generic bridge) → `ANTHROPIC_API_KEY` (Claude bridge) → vision checks `SKIPPED`. When both exist, `MODEL_NAME` also overrides `vision.model` from `policy.yaml`.
+
+Examples:
+
+```bash
+# OpenRouter (hosted, needs a key)
+export LLM_URL=https://openrouter.ai/api/v1
+export MODEL_NAME=qwen/qwen2.5-vl-72b-instruct
+export LLM_API_KEY=sk-or-...
+
+# Ollama (local, no key needed)
+export LLM_URL=http://localhost:11434/v1
+export MODEL_NAME=qwen2.5-vl
+
+# Anthropic-style gateway: set LLM_STYLE=anthropic, or rely on auto-detect
+# when the URL already ends in /v1/messages
+export LLM_URL=https://gateway.internal/v1/messages
+export MODEL_NAME=claude-haiku-4-5
+export LLM_API_KEY=...
+export LLM_STYLE=anthropic
+```
+
+**The model must be multimodal** (able to read images). A text-only model fails every observation, so every image/checkpoint turns into an error instead of a skip — intentional, so a misconfigured `MODEL_NAME` is immediately visible in the report.
 
 ## Project layout
 
@@ -143,7 +173,7 @@ src/jev_ui_agent/
 ├── extract/           # UI tree XML → normalized ScreenState (Android + iOS)
 ├── checks/            # rule checks, router (rules→JEV→vision), composite score
 ├── jev/               # JEV client (retry/usage tracking) + question bank
-├── vision/            # Claude Haiku bridge (screenshot → observation JSON)
+├── vision/            # vision bridges — Claude Haiku + generic LLM (screenshot → observation JSON)
 └── report/            # JSON + HTML renderers
 config/                # policy, devices, policy.fake
 flows/                 # test flow YAML files
@@ -158,7 +188,7 @@ scripts/               # setup_android.md (E2E runbook), verify_typesafe_sdk.py
 |---|---|
 | Language | Python 3.12 (uv) |
 | Judgment engine | JEV `jev-latest` ([typesafe-sdk](https://docs.typesafe.ai/)) |
-| Vision bridge | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) |
+| Vision bridge | any multimodal LLM via `LLM_URL` + `MODEL_NAME` (OpenAI- or Anthropic-style); default Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) |
 | UI automation | Appium 2 (`appium-python-client` 6.x, UiAutomator2) |
 | Testing | pytest — 97 tests, every API boundary mocked |
 
