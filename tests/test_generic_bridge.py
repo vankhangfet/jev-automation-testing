@@ -37,6 +37,7 @@ def test_openai_payload_and_parse(monkeypatch, tmp_path):
     assert content[0]["type"] == "image_url"
     assert content[0]["image_url"]["url"].startswith("data:image/png;base64,")
     assert seen["json"]["model"] == "qwen" and seen["json"]["max_tokens"] == 1024
+    assert "mobile UI test observer" in seen["json"]["messages"][0]["content"][1]["text"]
     assert bridge.calls == 1
 
 
@@ -96,6 +97,66 @@ def test_http_error_retries_then_unavailable(monkeypatch, tmp_path):
     with pytest.raises(VisionUnavailable):
         bridge.observe(str(img))
     assert calls["n"] == 2
+    assert bridge.calls == 0  # attempt fail không đếm — calls là billing events
+
+
+def test_garbage_text_retries_then_unavailable(monkeypatch, tmp_path):
+    img = tmp_path / "s.png"
+    img.write_bytes(b"\x89PNG\r\n\x1a\nX")
+    calls = {"n": 0}
+
+    def post(url, headers=None, json=None):
+        calls["n"] += 1
+        return _ok_openai("totally not json <<<>>> garbage")
+
+    monkeypatch.setattr(gb_mod.httpx, "Client", lambda **kw: SimpleNamespace(post=post))
+    bridge = GenericVisionBridge(base_url="http://x/v1", model="m", style="openai", retries=1)
+    bridge._sleep = lambda s: None
+    with pytest.raises(VisionUnavailable) as exc_info:
+        bridge.observe(str(img))
+    assert calls["n"] == 2
+    assert bridge.calls == 2  # HTTP đã hoàn tất — vẫn là billing event (như claude_bridge)
+    assert "unparseable observation" in str(exc_info.value)
+    assert "totally not json" in str(exc_info.value)
+
+
+def test_openai_content_list_parts(monkeypatch, tmp_path):
+    img = tmp_path / "s.png"
+    img.write_bytes(b"\x89PNG\r\n\x1a\nX")
+
+    def post(url, headers=None, json=None):
+        return SimpleNamespace(status_code=200, raise_for_status=lambda: None, json=lambda: {
+            "choices": [{"message": {"content": [
+                {"type": "text", "text": '{"blank_areas": "none", '},
+                {"type": "text", "text": '"broken_images": "none", "text_cut": "none",'
+                                         ' "summary": "split"}'},
+            ]}}]})
+
+    monkeypatch.setattr(gb_mod.httpx, "Client", lambda **kw: SimpleNamespace(post=post))
+    bridge = GenericVisionBridge(base_url="http://x/v1", model="m", style="openai")
+    obs = bridge.observe(str(img))
+    assert obs["summary"] == "split"
+
+
+@pytest.mark.parametrize("base,expected", [
+    ("https://gw/anthropic/v1/messages", "https://gw/anthropic/v1/messages"),  # giữ nguyên
+    ("https://api.anthropic.com", "https://api.anthropic.com/v1/messages"),   # bare → nối
+])
+def test_anthropic_endpoint_suffix(base, expected, monkeypatch, tmp_path):
+    img = tmp_path / "s.png"
+    img.write_bytes(b"\x89PNG\r\n\x1a\nX")
+    seen = {}
+
+    def post(url, headers=None, json=None):
+        seen["url"] = url
+        return SimpleNamespace(status_code=200, raise_for_status=lambda: None, json=lambda: {
+            "content": [{"type": "text", "text": '{"blank_areas": "none", "broken_images": "none",'
+                                                 ' "text_cut": "none", "summary": "e"}'}]})
+
+    monkeypatch.setattr(gb_mod.httpx, "Client", lambda **kw: SimpleNamespace(post=post))
+    bridge = GenericVisionBridge(base_url=base, model="m", style="anthropic")
+    bridge.observe(str(img))
+    assert seen["url"] == expected
 
 
 def test_observe_detailed_reuses_normalize(monkeypatch, tmp_path):

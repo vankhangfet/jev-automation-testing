@@ -91,13 +91,15 @@ class GenericVisionBridge:
         data_b64 = base64.b64encode(raw).decode()
         media = _sniff_media_type(raw)
         last_err: Exception | None = None
-        text = ""
         for attempt in range(self.retries + 1):
             try:
+                text = self._request(prompt, media, data_b64)
                 with self._lock:
                     self.calls += 1
-                text = self._request(prompt, media, data_b64)
-                obs = _extract_json(text)
+                try:
+                    obs = _extract_json(text)
+                except ValueError as e:
+                    raise ValueError(f"unparseable observation: {text[:200]!r}") from e
                 if not isinstance(obs, dict):
                     raise ValueError(f"observation không phải JSON object: {text[:200]!r}")
                 return _normalize_obs(obs, keys)
