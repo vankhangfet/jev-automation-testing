@@ -64,6 +64,11 @@ def _extract_json(text: str) -> dict:
     return json.loads(m.group(1) if m else text)
 
 
+def _normalize_obs(obs: dict, keys: tuple[str, ...]) -> dict:
+    """Fill đủ keys: list-keys → [], còn lại 'none'."""
+    return {k: obs.get(k, [] if k in _LIST_KEYS else "none") for k in keys}
+
+
 class VisionBridge:
     """Gọi Claude trả observation JSON có cấu trúc cho JEV phán xét."""
 
@@ -114,8 +119,7 @@ class VisionBridge:
                 obs = _extract_json(text)
                 if not isinstance(obs, dict):
                     raise ValueError(f"observation is not a JSON object: {text[:200]!r}")
-                return {k: obs.get(k, [] if k in _LIST_KEYS else "none")
-                        for k in keys}
+                return _normalize_obs(obs, keys)
             except Exception as e:  # noqa: BLE001 — layer boundary
                 if text:
                     last_err = ValueError(f"unparseable observation: {text[:200]!r}")
