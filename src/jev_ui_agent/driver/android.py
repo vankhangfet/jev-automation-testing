@@ -18,11 +18,23 @@ _BY = {
 }
 
 
+def _xpath_text_predicate(value: str) -> str:
+    """XPath 1.0 không có escape cho nháy trong literal — dùng concat()."""
+    if "'" not in value:
+        return f"'{value}'"
+    args: list[str] = []
+    for i, part in enumerate(value.split("'")):
+        if i:
+            args.append("\"'\"")  # literal nháy đơn, bọc trong nháy kép
+        args.append(f"'{part}'")
+    return f"concat({', '.join(args)})"
+
+
 def to_appium_locator(selector: str) -> tuple[str, str]:
     """Pure mapping 'res-id:x' → (AppiumBy.ID, 'x'). Text → xpath theo @text."""
     kind, value = parse(selector)
     if kind == "text":
-        return AppiumBy.XPATH, f"//*[@text='{value}']"
+        return AppiumBy.XPATH, f"//*[@text={_xpath_text_predicate(value)}]"
     return _BY[kind], value
 
 
@@ -34,15 +46,30 @@ class AndroidDriver(BaseDriver):
         opts = UiAutomator2Options()
         for key, value in device_cfg.get("capabilities", {}).items():
             opts.set_capability(key, value)
-        self._d = appium_webdriver.Remote(server_url, options=opts)
+        self._opts = opts
+        self._server_url = server_url
+        self._d = None
 
-    def connect(self) -> None: ...  # session được tạo trong __init__
+    def _session(self):
+        if self._d is None:
+            raise RuntimeError("AndroidDriver chưa connect()")
+        return self._d
 
-    def launch(self) -> None: ...  # appium tự launch app theo capability "app"
+    def connect(self) -> None:
+        # session tạo ở đây (không phải __init__) để pipeline try/finally
+        # thực sự dọn session khi connect fail giữa chừng
+        self._d = appium_webdriver.Remote(self._server_url, options=self._opts)
+
+    def launch(self) -> None:
+        package = self._opts.to_capabilities().get("appium:appPackage") or \
+            "com.google.samples.apps.nowinandroid"
+        d = self._session()
+        if hasattr(d, "activate_app"):
+            d.activate_app(package)
 
     def _find(self, selector: str):
         by, value = to_appium_locator(selector)
-        return self._d.find_element(by, value)
+        return self._session().find_element(by, value)
 
     def tap(self, target: str) -> None:
         self._find(target).click()
@@ -51,19 +78,21 @@ class AndroidDriver(BaseDriver):
         self._find(target).send_keys(value)
 
     def swipe(self, x1, y1, x2, y2, duration_ms: int = 500) -> None:
-        self._d.swipe(x1, y1, x2, y2, duration_ms)
+        self._session().swipe(x1, y1, x2, y2, duration_ms)
 
     def capture(self, checkpoint: str) -> StepArtifact:
+        d = self._session()
         png = self.out_dir / "artifacts" / f"{checkpoint}.png"
-        ok = self._d.get_screenshot_as_file(str(png))  # trả bool, KHÔNG raise khi fail
+        ok = d.get_screenshot_as_file(str(png))  # trả bool, KHÔNG raise khi fail
         if not ok or not png.exists():
             raise RuntimeError(f"screenshot failed for {checkpoint!r}")
         try:
-            activity = self._d.current_activity
+            activity = d.current_activity
         except Exception:  # noqa: BLE001
             activity = ""
         return StepArtifact(checkpoint=checkpoint, screenshot_path=str(png),
-                            source_xml=self._d.page_source, activity=activity)
+                            source_xml=d.page_source, activity=activity)
 
     def quit(self) -> None:
-        self._d.quit()
+        if self._d is not None:
+            self._d.quit()
