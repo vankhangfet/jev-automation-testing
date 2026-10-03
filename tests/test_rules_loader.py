@@ -50,11 +50,21 @@ def test_score_default_criteria(tmp_path):
     "name: x\nrules:\n  - id: a\n",                    # thiếu instruction
     "name: x\nrules:\n  - id: a\n    instruction: hi\n    type: dance\n",  # type lạ
     "name: x\nrules:\n  - id: a\n    instruction: hi\n    type: score\n    criteria: [a, b]\n",  # criteria != 5
+    "name: x\nrules:\n  - id: a\n    instruction: hi\n    type: score\n    criteria: []\n",  # criteria rỗng
+    "name: x\nrules:\n  - id: a\n    instruction: hi\n    type: score\n    criteria: [ok, \"\", ok, ok, ok]\n",  # criteria item rỗng
+    "name: x\nrules:\n  - id: a\n    instruction: hi\n    type: score\n    criteria: [1, 2, 3, 4, 5]\n",  # criteria item không phải chuỗi
     "name: x\nrules:\n  - id: a\n    instruction: hi\n    type: score\n    pass_at: 1.5\n",  # pass_at ngoài [0,1]
+    "name: x\nrules:\n  - id: a\n    instruction: hi\n    type: score\n    pass_at: true\n",  # pass_at bool
+    "name: x\nrules:\n  - id: a\n    instruction: hi\n    type: score\n    pass_at: false\n",  # pass_at bool
 ])
 def test_invalid_rules(tmp_path, bad):
     with pytest.raises(RulesError):
         load_rules(_write(tmp_path, bad))
+
+
+def test_null_criteria_uses_default(tmp_path):
+    r = load_rules(_write(tmp_path, "name: x\nrules:\n  - id: s1\n    instruction: Rate it\n    type: score\n    criteria: null\n"))
+    assert r["rules"][0]["criteria"] == DEFAULT_SCORE_CRITERIA
 
 
 def test_missing_file():

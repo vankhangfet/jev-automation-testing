@@ -51,14 +51,18 @@ def load_rules(path: Path | str) -> dict:
             raise RulesError(f"Rule {rid!r}: type phải thuộc {sorted(_TYPES)}, got {rtype!r}")
         rule = {"id": rid, "instruction": instruction.strip(), "type": rtype}
         if rtype == "score":
-            criteria = item.get("criteria") or DEFAULT_SCORE_CRITERIA
-            if not isinstance(criteria, list) or len(criteria) != 5:
+            criteria = item.get("criteria")
+            if criteria is None:
+                criteria = DEFAULT_SCORE_CRITERIA
+            elif not isinstance(criteria, list) or len(criteria) != 5:
                 raise RulesError(f"Rule {rid!r}: criteria (nếu có) phải là đúng 5 mức")
+            if not all(isinstance(c, str) and c.strip() for c in criteria):
+                raise RulesError(f"Rule {rid!r}: mỗi mức criteria phải là chuỗi không rỗng")
             rule["criteria"] = [str(c) for c in criteria]
-            try:
-                pass_at = float(item.get("pass_at", 0.75))
-            except (TypeError, ValueError) as e:
-                raise RulesError(f"Rule {rid!r}: pass_at phải là số") from e
+            raw_pass = item.get("pass_at", 0.75)
+            if isinstance(raw_pass, bool) or not isinstance(raw_pass, (int, float)):
+                raise RulesError(f"Rule {rid!r}: pass_at phải là số")
+            pass_at = float(raw_pass)
             if not 0.0 <= pass_at <= 1.0:
                 raise RulesError(f"Rule {rid!r}: pass_at phải trong [0, 1]")
             rule["pass_at"] = pass_at
