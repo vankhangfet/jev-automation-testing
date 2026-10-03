@@ -40,3 +40,15 @@ def test_render_html_markers():
     assert "acc-id:Go" in html          # failed step hiển thị
     assert 'src="artifacts/home.png"' in html
     assert "0.8123" in html
+
+
+def test_render_html_summary_section():
+    rep = sample_report()
+    rep.summary = {"total_images": 10, "passed": 7, "failed": 2, "needs_review": 1,
+                   "errors": 0, "duplicates": 3, "rules": 5, "missing": 1}
+    html = render_html(rep)
+    assert "Batch summary" in html and "10" in html and "Passed" in html
+
+
+def test_render_html_no_summary_when_empty():
+    assert "Batch summary" not in render_html(sample_report())

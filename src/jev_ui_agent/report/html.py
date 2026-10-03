@@ -36,6 +36,20 @@ _TEMPLATE = """<!doctype html>
 <h1>JEV UI Checking — {{ report.flow_name }}</h1>
 <p class="meta">Run <b>{{ report.run_id }}</b> · bắt đầu {{ report.started_at }}
    · {{ report.checkpoints | length }} checkpoint</p>
+{% if report.summary %}
+<div class="card"><h2>Batch summary</h2>
+  <table>
+    <tr><th>Total images</th><td>{{ report.summary.total_images }}</td>
+        <th>Passed</th><td>{{ report.summary.passed }}</td></tr>
+    <tr><th>Failed</th><td>{{ report.summary.failed }}</td>
+        <th>Needs review</th><td>{{ report.summary.needs_review }}</td></tr>
+    <tr><th>Errors</th><td>{{ report.summary.errors }}</td>
+        <th>Duplicates</th><td>{{ report.summary.duplicates }}</td></tr>
+    <tr><th>Missing</th><td>{{ report.summary.missing | default(0) }}</td>
+        <th>Rules</th><td>{{ report.summary.rules | default(0) }}</td></tr>
+  </table>
+</div>
+{% endif %}
 {% if report.failed_steps %}
 <div class="card"><h2>Failed steps</h2>
   <ul class="failed-steps">{% for s in report.failed_steps %}<li>{{ s }}</li>{% endfor %}</ul>
