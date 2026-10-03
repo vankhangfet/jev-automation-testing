@@ -46,14 +46,17 @@ def _do_action(driver: BaseDriver, step: dict) -> None:
                      int(step.get("duration", 500)))
 
 
-def _try_action(driver: BaseDriver, step: dict, retries: int = 1) -> bool:
+def _try_action(driver: BaseDriver, step: dict, retries: int = 1) -> str | None:
+    """Thành công → None; thất bại → chuỗi lý do của lần thử cuối."""
+    last_err: Exception | None = None
     for _ in range(retries + 1):
         try:
             _do_action(driver, step)
-            return True
-        except Exception:  # noqa: BLE001 — action failure là dữ liệu, không phải crash
+            return None
+        except Exception as e:  # noqa: BLE001 — action failure là dữ liệu, không phải crash
+            last_err = e
             continue
-    return False
+    return f"{type(last_err).__name__}: {last_err}"
 
 
 def run_flow(*, flow_path: Path | str, policy_path: Path | str,
@@ -64,8 +67,13 @@ def run_flow(*, flow_path: Path | str, policy_path: Path | str,
     policy = load_yaml(policy_path)
     devices = load_yaml(devices_path)
 
-    run_id = f"run-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-    out_dir = Path(out_root) / run_id
+    base_id = f"run-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    out_dir = Path(out_root) / base_id
+    suffix = 1
+    while out_dir.exists():  # chống đè report khi 2 run cùng giây
+        out_dir = Path(out_root) / f"{base_id}-{suffix}"
+        suffix += 1
+    run_id = out_dir.name
     (out_dir / "artifacts").mkdir(parents=True, exist_ok=True)
 
     platform = flow.get("platform", "android")
@@ -74,12 +82,11 @@ def run_flow(*, flow_path: Path | str, policy_path: Path | str,
         raise ValueError(f"devices.yaml không có cấu hình cho platform {platform!r}")
 
     driver = make_driver(driver_kind, device_cfg, out_dir, fixtures_dir)
-    driver.connect()
-
     report = RunReport(run_id=run_id, flow_name=flow["name"],
                        started_at=datetime.now().isoformat(timespec="seconds"))
 
     try:
+        driver.connect()  # trong try để connect fail vẫn quit() session nếu có
         for step in flow["steps"]:
             if step["kind"] == "checkpoint":
                 cp = CheckpointReport(checkpoint=step["name"])
@@ -93,12 +100,13 @@ def run_flow(*, flow_path: Path | str, policy_path: Path | str,
                     cp.results = run_checks(state, policy, jev, vision)
                     cp.screen_score = score_checkpoint(cp.results, policy.get("weights", {}))
                 except Exception as e:  # noqa: BLE001 — bao gồm ET.ParseError và policy lỗi
-                    cp.error = str(e)
+                    cp.error = f"{type(e).__name__}: {e}"
                 report.checkpoints.append(cp)
             else:
-                if not _try_action(driver, step):
+                err = _try_action(driver, step)
+                if err is not None:
                     report.failed_steps.append(
-                        f"{step['action']} {step.get('target', '')}".strip())
+                        f"{step['action']} {step.get('target', '')}".strip() + f": {err}")
     finally:
         try:
             driver.quit()
