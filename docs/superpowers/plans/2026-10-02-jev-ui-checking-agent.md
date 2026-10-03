@@ -2398,6 +2398,42 @@ def test_missing_fixture_records_error(tmp_path):
     assert report.checkpoints[0].results == []      # nhưng pipeline không chết
 
 
+class FakeJev:
+    def __init__(self):
+        self.usage = {"calls": 2, "input_tokens": 800, "output_tokens": 100}
+        self.states = []
+
+    def judge(self, state, questions):
+        self.states.append((state, sorted(questions)))
+        return {k: {"value": 0.0 if "raw" in k or "dev" in k or k.startswith("visual") else
+                    ("normal" if k == "screen_class" else 4.0),
+                    "confidence": 0.95, "probabilities": {"normal": 1.0}}
+                for k in questions}
+
+
+class FakeVision:
+    def __init__(self):
+        self.calls = 0
+
+    def observe(self, path):
+        self.calls += 1
+        return {"blank_areas": "none", "broken_images": "none", "text_cut": "none",
+                "summary": "ok"}
+
+
+def test_injected_clients_record_costs(tmp_path):
+    jev, vision = FakeJev(), FakeVision()
+    report = run_flow(flow_path=_flow(tmp_path), policy_path=FIX / "policy_test.yaml",
+                      devices_path=REPO_ROOT / "config" / "devices.yaml",
+                      driver_kind="fake", out_root=tmp_path / "reports",
+                      fixtures_dir=FIX / "fake_run", jev=jev, vision=vision)
+    assert report.costs["jev"]["calls"] == 6        # 3 checkpoint × 2 (core+visual)
+    assert report.costs["vision"] == {"calls": 3}
+    # payload shape qua pipeline thật: element có label + bounds
+    first_state, _ = jev.states[0]
+    assert first_state["elements"] and "label" in first_state["elements"][0]
+
+
 def test_try_action_retries_then_records(tmp_path):
     from jev_ui_agent.pipeline import _try_action
 
@@ -2411,13 +2447,14 @@ def test_try_action_retries_then_records(tmp_path):
                 raise RuntimeError("flaky")
             return None
 
-    assert _try_action(Flaky(), {"action": "tap", "target": "x"}) is True
+    assert _try_action(Flaky(), {"action": "tap", "target": "x"}) is None
 
     class Dead:
         def tap(self, target):
             raise RuntimeError("dead")
 
-    assert _try_action(Dead(), {"action": "tap", "target": "x"}) is False
+    err = _try_action(Dead(), {"action": "tap", "target": "x"})
+    assert err is not None and "RuntimeError" in err
 ```
 
 - [ ] **Step 5: Run — expect FAIL**
@@ -2477,14 +2514,17 @@ def _do_action(driver: BaseDriver, step: dict) -> None:
                      int(step.get("duration", 500)))
 
 
-def _try_action(driver: BaseDriver, step: dict, retries: int = 1) -> bool:
+def _try_action(driver: BaseDriver, step: dict, retries: int = 1) -> str | None:
+    """Thành công → None; thất bại → chuỗi lý do của lần thử cuối."""
+    last_err: Exception | None = None
     for _ in range(retries + 1):
         try:
             _do_action(driver, step)
-            return True
-        except Exception:  # noqa: BLE001 — action failure là dữ liệu, không phải crash
+            return None
+        except Exception as e:  # noqa: BLE001 — action failure là dữ liệu, không phải crash
+            last_err = e
             continue
-    return False
+    return f"{type(last_err).__name__}: {last_err}"
 
 
 def run_flow(*, flow_path: Path | str, policy_path: Path | str,
@@ -2495,8 +2535,13 @@ def run_flow(*, flow_path: Path | str, policy_path: Path | str,
     policy = load_yaml(policy_path)
     devices = load_yaml(devices_path)
 
-    run_id = f"run-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-    out_dir = Path(out_root) / run_id
+    base_id = f"run-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+    out_dir = Path(out_root) / base_id
+    suffix = 1
+    while out_dir.exists():  # chống đè report khi 2 run cùng giây
+        out_dir = Path(out_root) / f"{base_id}-{suffix}"
+        suffix += 1
+    run_id = out_dir.name
     (out_dir / "artifacts").mkdir(parents=True, exist_ok=True)
 
     platform = flow.get("platform", "android")
@@ -2505,12 +2550,11 @@ def run_flow(*, flow_path: Path | str, policy_path: Path | str,
         raise ValueError(f"devices.yaml không có cấu hình cho platform {platform!r}")
 
     driver = make_driver(driver_kind, device_cfg, out_dir, fixtures_dir)
-    driver.connect()
-
     report = RunReport(run_id=run_id, flow_name=flow["name"],
                        started_at=datetime.now().isoformat(timespec="seconds"))
 
     try:
+        driver.connect()  # trong try để connect fail vẫn quit() session nếu có
         for step in flow["steps"]:
             if step["kind"] == "checkpoint":
                 cp = CheckpointReport(checkpoint=step["name"])
@@ -2524,12 +2568,13 @@ def run_flow(*, flow_path: Path | str, policy_path: Path | str,
                     cp.results = run_checks(state, policy, jev, vision)
                     cp.screen_score = score_checkpoint(cp.results, policy.get("weights", {}))
                 except Exception as e:  # noqa: BLE001 — bao gồm ET.ParseError và policy lỗi
-                    cp.error = str(e)
+                    cp.error = f"{type(e).__name__}: {e}"
                 report.checkpoints.append(cp)
             else:
-                if not _try_action(driver, step):
+                err = _try_action(driver, step)
+                if err is not None:
                     report.failed_steps.append(
-                        f"{step['action']} {step.get('target', '')}".strip())
+                        f"{step['action']} {step.get('target', '')}".strip() + f": {err}")
     finally:
         try:
             driver.quit()
