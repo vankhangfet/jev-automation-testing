@@ -1,6 +1,6 @@
 # JEV Automation Testing
 
-![Tests](https://img.shields.io/badge/tests-97%2F97%20passing-brightgreen) ![Python](https://img.shields.io/badge/python-3.12-blue) ![Driver](https://img.shields.io/badge/platform-Android%20%7C%20Fake-orange)
+![Tests](https://img.shields.io/badge/tests-154%2F154%20passing-brightgreen) ![Python](https://img.shields.io/badge/python-3.12-blue) ![Driver](https://img.shields.io/badge/platform-Android%20%7C%20Fake-orange)
 
 **A mobile UI testing agent that uses [JEV](https://docs.typesafe.ai/) (TypeSafe's judgment engine) as its decision-making brain.**
 
@@ -50,7 +50,7 @@ Mobile App → UI Automation (Appium/Fake) → Screenshot + UI Tree
 git clone https://github.com/vankhangfet/jev-automation-testing.git
 cd jev-automation-testing
 uv sync          # Python 3.12 (pinned via .python-version)
-uv run pytest    # 97 tests — fully offline, no device or API key required
+uv run pytest    # 154 tests — fully offline, no device or API key required
 ```
 
 ## Offline demo (60 seconds, nothing else needed)
@@ -139,7 +139,7 @@ Read from the shell (no automatic `.env` loading; see `.env.example`):
 | `LLM_STYLE` | Optional protocol hint: `openai` \| `anthropic`. Auto-detected from the URL by default (contains `/v1/messages` → anthropic). |
 | `ANTHROPIC_API_KEY` | Fallback vision source: the Anthropic SDK with pinned Claude Haiku. |
 
-**Vision source priority**: `LLM_URL` + `MODEL_NAME` (generic bridge) → `ANTHROPIC_API_KEY` (Claude bridge) → vision checks `SKIPPED`. When both exist, `MODEL_NAME` also overrides `vision.model` from `policy.yaml`.
+**Vision source priority**: `LLM_URL` + `MODEL_NAME` (generic bridge) → `ANTHROPIC_API_KEY` (Claude bridge) → vision checks `SKIPPED`. The vision model comes from `MODEL_NAME` (generic bridge) or the pinned Claude Haiku default (`ANTHROPIC_API_KEY` path) — `policy.yaml` no longer controls the vision model.
 
 Examples:
 
@@ -161,7 +161,7 @@ export LLM_API_KEY=...
 export LLM_STYLE=anthropic
 ```
 
-**The model must be multimodal** (able to read images). A text-only model fails every observation, so every image/checkpoint turns into an error instead of a skip — intentional, so a misconfigured `MODEL_NAME` is immediately visible in the report.
+**The model must be multimodal** (able to read images). A text-only model fails every observation — in `check-screenshots` every image is recorded as an error, while in `run` mode the visual checks come back `SKIPPED` (a failed observation maps to `VisionUnavailable` → skip, not error). Either way the report makes the misconfigured `MODEL_NAME` visible.
 
 ## Project layout
 
@@ -177,7 +177,7 @@ src/jev_ui_agent/
 └── report/            # JSON + HTML renderers
 config/                # policy, devices, policy.fake
 flows/                 # test flow YAML files
-tests/                 # 97 tests + fixtures (UI tree XML for both platforms)
+tests/                 # 154 tests + fixtures (UI tree XML for both platforms)
 docs/superpowers/      # design spec + implementation plan (13 TDD tasks)
 scripts/               # setup_android.md (E2E runbook), verify_typesafe_sdk.py
 ```
@@ -190,11 +190,11 @@ scripts/               # setup_android.md (E2E runbook), verify_typesafe_sdk.py
 | Judgment engine | JEV `jev-latest` ([typesafe-sdk](https://docs.typesafe.ai/)) |
 | Vision bridge | any multimodal LLM via `LLM_URL` + `MODEL_NAME` (OpenAI- or Anthropic-style); default Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) |
 | UI automation | Appium 2 (`appium-python-client` 6.x, UiAutomator2) |
-| Testing | pytest — 97 tests, every API boundary mocked |
+| Testing | pytest — 154 tests, every API boundary mocked |
 
 ## Roadmap
 
-- ✅ **Phase 1**: full hybrid pipeline (rules + JEV + vision), HTML/JSON reports with cost tracking, fake-driver demo, Appium Android infrastructure, 97 offline tests
+- ✅ **Phase 1**: full hybrid pipeline (rules + JEV + vision), HTML/JSON reports with cost tracking, fake-driver demo, Appium Android infrastructure, offline test suite
 - 🔜 **Phase 2**: iOS driver (XCUITest) — the extractor already parses XCUI trees; **Figma design comparison** (Figma API → JSON → JEV cross-checked against the UI tree)
 - 🔮 **Phase 3**: exploratory mode (the agent explores the app on its own)
 

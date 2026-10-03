@@ -164,3 +164,23 @@ def test_run_uses_vision_factory(monkeypatch, tmp_path):
                "--fixtures-dir", str(FIX / "fake_run")])
     assert rc == 0
     assert seen["vision"] is not None and seen["jev"] is None
+
+
+def test_invalid_llm_style_exits_2_both_commands(monkeypatch, tmp_path, capsys):
+    """LLM_STYLE sai → exit 2 graceful ở cả check-screenshots lẫn run (không traceback)."""
+    monkeypatch.setenv("TYPESAFE_API_KEY", "k")
+    monkeypatch.setenv("LLM_URL", "http://localhost:11434/v1")
+    monkeypatch.setenv("MODEL_NAME", "qwen2.5-vl")
+    monkeypatch.setenv("LLM_STYLE", "bogus")
+
+    rc = main(["check-screenshots", "--dir", str(tmp_path), "--rules", "r.yaml"])
+    assert rc == 2
+    assert "Invalid vision configuration" in capsys.readouterr().err
+
+    rc = main(["run", "--flow", str(_flow(tmp_path, ("home",))), "--driver", "fake",
+               "--policy", str(REPO_ROOT / "config" / "policy.fake.yaml"),
+               "--devices", str(REPO_ROOT / "config" / "devices.yaml"),
+               "--out", str(tmp_path / "r"),
+               "--fixtures-dir", str(FIX / "fake_run")])
+    assert rc == 2
+    assert "Invalid vision configuration" in capsys.readouterr().err

@@ -37,7 +37,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "run":
         jev = JevClient() if os.environ.get("TYPESAFE_API_KEY") else None
-        vision = make_vision_bridge()  # None khi không có nguồn vision nào
+        try:
+            vision = make_vision_bridge()  # None khi không có nguồn vision nào
+        except ValueError as e:
+            print(f"Invalid vision configuration: {e}", file=sys.stderr)
+            return 2
         report = run_flow(
             flow_path=args.flow, policy_path=args.policy, devices_path=args.devices,
             driver_kind=args.driver, out_root=args.out,
@@ -73,7 +77,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"WARNING: {len(rules_preview['rules'])} rules trong 1 fan-out call — "
                   "JEV trả thiếu 1 answer sẽ làm mất cả bộ; cân nhắc tách rules file.",
                   file=sys.stderr)
-        vision = make_vision_bridge()  # max_tokens=2048 mặc định — observation cần headroom
+        try:
+            vision = make_vision_bridge()  # max_tokens=2048 mặc định — observation cần headroom
+        except ValueError as e:
+            print(f"Invalid vision configuration: {e}", file=sys.stderr)
+            return 2
         report = run_batch(images_dir=args.dir, rules_path=args.rules,
                            policy_path=args.policy, out_root=args.out,
                            workers=max(1, args.workers), limit=args.limit,

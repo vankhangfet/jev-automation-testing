@@ -35,5 +35,4 @@ error_anomaly:
   # screen_class rơi vào nhóm này → NEEDS_REVIEW thay vì FAIL
   review_classes: [empty_state, loading_stuck]
 vision:
-  model: claude-haiku-4-5-20251001
   max_calls_per_checkpoint: 1  # knob tương lai — chưa nối vào VisionBridge
