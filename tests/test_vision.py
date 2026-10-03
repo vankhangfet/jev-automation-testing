@@ -138,6 +138,7 @@ def test_observe_detailed_keys_and_media_type(monkeypatch, tmp_path):
     obs = vb.observe_detailed(str(img))
     assert seen["messages"][0]["content"][0]["source"]["media_type"] == "image/jpeg"
     assert obs["screen_type"] == "login"
+    assert obs["layout"] == []  # list-key thiếu được normalize thành list rỗng
     import jev_ui_agent.vision.claude_bridge as bm
     for key in bm.OBS_DETAIL_KEYS:
         assert key in obs  # normalize fill đủ keys

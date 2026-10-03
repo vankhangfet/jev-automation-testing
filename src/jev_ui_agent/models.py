@@ -108,3 +108,4 @@ class RunReport:
     checkpoints: list[CheckpointReport] = field(default_factory=list)
     failed_steps: list[str] = field(default_factory=list)
     costs: dict[str, Any] = field(default_factory=dict)
+    summary: dict[str, Any] = field(default_factory=dict)  # batch mode: stats tổng hợp
