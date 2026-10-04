@@ -96,6 +96,8 @@ Useful flags: `--out reports/login`, `--workers 4`, `--limit 50`, `--no-recursiv
 
 **Tips:** describe things that are visible on screen, be specific (`"a button labeled 'Sign in'"`), and write rules in English for the best accuracy.
 
+**Try it now:** [`demo/`](demo/) contains 5 ready-made login screenshots (4 with planted defects) plus matching rules — see [demo/README.md](demo/README.md).
+
 ### Mode 2: Live UI automation (Appium)
 
 Describe the user journey. At each `checkpoint`, the agent captures a screenshot and UI tree, then runs 5 check groups (functional, layout, content quality, error/anomaly, visual) into a weighted screen score.

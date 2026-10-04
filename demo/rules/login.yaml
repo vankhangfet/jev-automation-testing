@@ -1,0 +1,27 @@
+name: login_screen_demo
+rules:
+  # Catches: blank/loading screen (05)
+  - id: login_form_visible
+    instruction: "Email and password input fields and a 'Sign in' button are visible"
+
+  # Catches: button hanging off the screen edge (02)
+  - id: no_cut_off_elements
+    instruction: "No element is cut off or extends beyond the visible screen edges; the sign-in button fits fully inside the screen"
+
+  # Catches: heading rendered on top of the email field (02)
+  - id: no_overlapping_elements
+    instruction: "No text overlaps another element; heading, input fields, button and link are cleanly separated"
+
+  # Catches: raw i18n keys instead of human text (03)
+  - id: heading_is_human_text
+    instruction: "The heading is natural human-readable text such as 'Welcome back', not a raw localization key like 'login.title'"
+
+  # Catches: red error banner (04)
+  - id: no_error_banner
+    instruction: "No red error banner or error message is visible"
+
+  # Catch-all quality gate
+  - id: layout_polish
+    type: score
+    instruction: "Overall layout polish: consistent margins, alignment and spacing"
+    pass_at: 0.75

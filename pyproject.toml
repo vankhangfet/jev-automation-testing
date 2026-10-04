@@ -13,7 +13,10 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = [
+    "pillow>=12.3.0",
+    "pytest>=8",
+]
 
 [build-system]
 requires = ["hatchling"]
