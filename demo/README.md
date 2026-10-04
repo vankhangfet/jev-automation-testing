@@ -56,6 +56,15 @@ copy demo\.env.example demo\.env    # PowerShell
 
 `.env` is git-ignored, so your keys never reach the repo.
 
+**`MODEL_NAME` must be multimodal** (accept image input). If it isn't, every
+image fails — but now with the endpoint's own explanation, e.g.:
+
+- `vision endpoint HTTP 400: ... "Unknown Model, please check the model code."` — the model name doesn't exist at `LLM_URL`
+- `vision endpoint HTTP 400: ... "messages.content.type is invalid, allowed values: ['text']"` — the model is text-only, pick a vision model
+- `vision model returned empty content — ... try a higher max_tokens or another model` — the model spent its token budget on reasoning
+
+Worked example (Z.ai GLM coding endpoint): `LLM_URL=https://api.z.ai/api/coding/paas/v4`, `MODEL_NAME=glm-4.5v` (the glm-5.x family also accepts images; glm-4.5 / glm-4.5-air / glm-4.6 are text-only).
+
 ## Run it
 
 The runner scripts load `.env` automatically (they also pick up a `.env` at the

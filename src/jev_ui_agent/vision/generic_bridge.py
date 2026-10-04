@@ -13,6 +13,10 @@ from jev_ui_agent.vision.claude_bridge import (
 )
 
 
+class _PermanentVisionError(VisionUnavailable):
+    """HTTP 4xx (trừ 408/429) — lỗi cấu hình (sai model, sai key...), thử lại không giúp gì."""
+
+
 class GenericVisionBridge:
     """Vision bridge cho endpoint LLM tùy ý (OpenAI-style hoặc Anthropic-style).
 
@@ -72,7 +76,14 @@ class GenericVisionBridge:
                             "image_url": {"url": f"data:{media_type};base64,{data_b64}"}},
                            {"type": "text", "text": prompt}]}]}
         resp = self._client.post(self._endpoint(), headers=self._headers(), json=payload)
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            # Giữ lại body lỗi của endpoint (VD "Unknown Model",
+            # "messages.content.type is invalid") — raise_for_status() vứt nó đi.
+            detail = (resp.text or "").strip()[:300]
+            msg = f"vision endpoint HTTP {resp.status_code}: {detail}"
+            if 400 <= resp.status_code < 500 and resp.status_code not in (408, 429):
+                raise _PermanentVisionError(msg)
+            raise VisionUnavailable(msg)
         body = resp.json()
         if self.style == "anthropic":
             parts = body.get("content", [])
@@ -99,10 +110,17 @@ class GenericVisionBridge:
                 try:
                     obs = _extract_json(text)
                 except ValueError as e:
+                    if not text.strip():
+                        raise ValueError(
+                            "vision model returned empty content — the model may have "
+                            "spent the token budget on reasoning; try a higher max_tokens "
+                            "or another model") from e
                     raise ValueError(f"unparseable observation: {text[:200]!r}") from e
                 if not isinstance(obs, dict):
                     raise ValueError(f"observation không phải JSON object: {text[:200]!r}")
                 return _normalize_obs(obs, keys)
+            except _PermanentVisionError:
+                raise
             except Exception as e:  # noqa: BLE001 — layer boundary
                 last_err = e
                 if attempt < self.retries:

@@ -100,6 +100,73 @@ def test_http_error_retries_then_unavailable(monkeypatch, tmp_path):
     assert bridge.calls == 0  # attempt fail không đếm — calls là billing events
 
 
+def _err_response(status, body):
+    return SimpleNamespace(status_code=status, text=body, json=lambda: (_ for _ in ()).throw(ValueError(body)))
+
+
+def test_http_4xx_surfaces_body_and_does_not_retry(monkeypatch, tmp_path):
+    """400 do model sai là lỗi cấu hình — phải hiện body lỗi của endpoint, không retry."""
+    img = tmp_path / "s.png"
+    img.write_bytes(b"\x89PNG\r\n\x1a\nX")
+    calls = {"n": 0}
+
+    def post(url, headers=None, json=None):
+        calls["n"] += 1
+        return _err_response(400, '{"error":{"code":"1211","message":"Unknown Model,'
+                                  ' please check the model code."}}')
+
+    monkeypatch.setattr(gb_mod.httpx, "Client", lambda **kw: SimpleNamespace(post=post))
+    bridge = GenericVisionBridge(base_url="http://x/v1", model="glm-5.3v",
+                                 style="openai", retries=1)
+    bridge._sleep = lambda s: None
+    with pytest.raises(VisionUnavailable) as exc_info:
+        bridge.observe(str(img))
+    assert calls["n"] == 1  # 4xx là lỗi vĩnh viễn — không thử lại
+    assert bridge.calls == 0
+    assert "HTTP 400" in str(exc_info.value)
+    assert "Unknown Model" in str(exc_info.value)
+
+
+@pytest.mark.parametrize("status", [429, 500, 503])
+def test_http_transient_errors_still_retry(monkeypatch, tmp_path, status):
+    """429/5xx có thể thoáng qua — vẫn retry theo cấu hình."""
+    img = tmp_path / "s.png"
+    img.write_bytes(b"\x89PNG\r\n\x1a\nX")
+    calls = {"n": 0}
+
+    def post(url, headers=None, json=None):
+        calls["n"] += 1
+        return _err_response(status, "server busy")
+
+    monkeypatch.setattr(gb_mod.httpx, "Client", lambda **kw: SimpleNamespace(post=post))
+    bridge = GenericVisionBridge(base_url="http://x/v1", model="m", style="openai", retries=1)
+    bridge._sleep = lambda s: None
+    with pytest.raises(VisionUnavailable) as exc_info:
+        bridge.observe(str(img))
+    assert calls["n"] == 2
+    assert f"HTTP {status}" in str(exc_info.value)
+
+
+def test_empty_content_gives_reasoning_hint(monkeypatch, tmp_path):
+    """Model reasoning (GLM) có thể trả content rỗng — lỗi phải gợi ý tăng max_tokens/đổi model."""
+    img = tmp_path / "s.png"
+    img.write_bytes(b"\x89PNG\r\n\x1a\nX")
+    calls = {"n": 0}
+
+    def post(url, headers=None, json=None):
+        calls["n"] += 1
+        return _ok_openai("")
+
+    monkeypatch.setattr(gb_mod.httpx, "Client", lambda **kw: SimpleNamespace(post=post))
+    bridge = GenericVisionBridge(base_url="http://x/v1", model="m", style="openai", retries=1)
+    bridge._sleep = lambda s: None
+    with pytest.raises(VisionUnavailable) as exc_info:
+        bridge.observe(str(img))
+    assert calls["n"] == 2 and bridge.calls == 2  # HTTP hoàn tất — billing event
+    assert "empty content" in str(exc_info.value)
+    assert "max_tokens" in str(exc_info.value)
+
+
 def test_garbage_text_retries_then_unavailable(monkeypatch, tmp_path):
     img = tmp_path / "s.png"
     img.write_bytes(b"\x89PNG\r\n\x1a\nX")

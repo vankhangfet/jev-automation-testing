@@ -9,12 +9,18 @@ $root = Split-Path -Parent $PSScriptRoot
 $envFile = Join-Path $PSScriptRoot ".env"
 if (-not (Test-Path $envFile)) { $envFile = Join-Path $root ".env" }
 if (Test-Path $envFile) {
-    Get-Content $envFile | ForEach-Object {
+    Get-Content -Encoding UTF8 $envFile | ForEach-Object {
         $line = $_.Trim()
         if ($line -and -not $line.StartsWith("#")) {
             $parts = $line -split "=", 2
             if ($parts.Count -eq 2 -and $parts[0].Trim()) {
-                Set-Item -Path ("Env:" + $parts[0].Trim()) -Value $parts[1].Trim()
+                $v = ($parts[1].Trim() -split "\s+#", 2)[0]  # drop inline comment
+                if ($v.Length -ge 2 -and (
+                    ($v.StartsWith('"') -and $v.EndsWith('"')) -or
+                    ($v.StartsWith("'") -and $v.EndsWith("'")))) {
+                    $v = $v.Substring(1, $v.Length - 2)      # drop matching quotes
+                }
+                Set-Item -Path ("Env:" + $parts[0].Trim()) -Value $v
             }
         }
     }
