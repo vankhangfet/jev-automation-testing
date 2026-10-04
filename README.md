@@ -8,8 +8,6 @@ JEV Automation Testing checks your app's screens with [JEV](https://docs.typesaf
 
 ![How JEV Automation Testing works](docs/assets/jev-demo.gif)
 
-[![Watch the demo video](docs/assets/jev-demo-poster.png)](docs/assets/jev-demo.mp4)
-
 ▶️ **[Watch the 75-second demo video](docs/assets/jev-demo.mp4)**
 
 ---
