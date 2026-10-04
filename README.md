@@ -63,6 +63,17 @@ uv run python -m jev_ui_agent run --flow flows/demo_fake.yaml \
 
 Open `reports/run-*/report.html`. The fixtures include a planted `login.title` i18n bug, which JEV flags when `TYPESAFE_API_KEY` is set.
 
+## Demo: 5 login screens, 4 planted bugs
+
+The [`demo/`](demo/) folder is a self-contained walkthrough of Mode 1 — no device needed. It ships **5 login screenshots with 4 planted defects** (broken layout with the button hanging off-screen, raw i18n keys, an error banner, a blank screen) and natural-language rules written to catch each one:
+
+```bash
+copy demo\.env.example demo\.env     # bash: cp — then fill in your keys
+.\demo\run.ps1                       # bash: ./demo/run.sh
+```
+
+Each buggy screen comes back `FAILED` with the failing rule and evidence explaining why; results land in `demo/reports/check-*/report.html`. Full walkthrough with expected outcomes per image: **[demo/README.md](demo/README.md)**.
+
 ---
 
 ## Usage
@@ -164,6 +175,7 @@ Exit codes: `0` all passed · `1` a check failed or an image errored · `2` conf
 
 ## Learn more
 
+- [Demo walkthrough](demo/README.md) — 5 login screens with planted defects, run it in one command
 - [Design specs](docs/superpowers/specs/) and [implementation plans](docs/superpowers/plans/)
 - [Android E2E runbook](scripts/setup_android.md)
 - Demo animation and video sources: [docs/assets/src/](docs/assets/src/) (HTML scenes rendered with Playwright + ffmpeg)
