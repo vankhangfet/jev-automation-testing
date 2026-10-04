@@ -1,0 +1,182 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="common.css">
+<style>
+  body { width: 960px; height: 540px; }
+  .hdr { left: 40px; top: 26px; display: flex; align-items: center; gap: 12px; }
+  .logo { width: 34px; height: 34px; border-radius: 9px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; color: #06101f; }
+  .hdr h1 { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+  .hdr p { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .tagr { right: 40px; top: 34px; font-size: 11px; color: var(--muted); display: flex; gap: 8px; }
+  .tagr span { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; }
+
+  .phone { left: 60px; top: 104px; width: 158px; height: 312px; }
+  .scr { position: absolute; inset: 0; }
+  .fname { left: 60px; width: 158px; top: 428px; text-align: center; font-size: 12px; color: var(--muted); }
+  .fname b { color: var(--text); font-weight: 600; }
+
+  .router { left: 280px; top: 96px; width: 340px; height: 334px; padding: 16px; }
+  .router .t { font-size: 14px; font-weight: 700; }
+  .router .s { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .lane { position: absolute; left: 16px; right: 16px; height: 72px; border-radius: 11px;
+    border: 1px solid var(--line); background: var(--bg2); padding: 11px 13px; }
+  .lane .n { position: absolute; left: 13px; top: 12px; width: 22px; height: 22px; border-radius: 6px;
+    background: #22304f; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .lane .l { margin-left: 32px; font-size: 13px; font-weight: 700; }
+  .lane .d { margin-left: 32px; font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+  .lane .badge { position: absolute; right: 12px; top: 11px; font-size: 9.5px; padding: 2px 7px; }
+  .lane .hl { position: absolute; inset: -1px; border-radius: 11px; border: 2px solid var(--accent);
+    box-shadow: 0 0 22px rgba(91,140,255,.45); opacity: 0; }
+  .lane .hl.red { border-color: var(--fail); box-shadow: 0 0 22px rgba(255,93,108,.45); }
+
+  .report { left: 660px; top: 96px; width: 260px; height: 334px; padding: 14px; }
+  .report .t { font-size: 13px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+  .report .t span { font-family: var(--mono); font-size: 10px; color: var(--muted); font-weight: 400; }
+  .sum { display: flex; gap: 6px; margin-top: 10px; }
+  .sum div { flex: 1; border: 1px solid var(--line); border-radius: 8px; padding: 6px 0; text-align: center; }
+  .sum b { display: block; font-size: 17px; }
+  .sum small { font-size: 9px; color: var(--muted); }
+  .row { position: absolute; left: 14px; right: 14px; height: 70px; border-radius: 10px;
+    background: var(--bg2); border: 1px solid var(--line); padding: 9px 11px; }
+  .row .f { font-size: 12px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+  .row .f .badge { font-size: 9.5px; padding: 2px 7px; }
+  .row .c { font-size: 10px; color: var(--muted); margin-top: 6px; font-family: var(--mono); }
+  .row .r { font-size: 10.5px; margin-top: 3px; }
+
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--accent2);
+    box-shadow: 0 0 14px 4px rgba(34,211,197,.6); margin: -6px 0 0 -6px; }
+  .wire { height: 2px; background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 11px); }
+  .cap { left: 0; right: 0; top: 462px; text-align: center; font-size: 16px; font-weight: 600; }
+  .cap em { font-style: normal; color: var(--accent2); }
+  .foot { left: 0; right: 0; top: 500px; text-align: center; font-size: 11px; color: var(--muted); }
+</style></head>
+<body>
+<div class="grid-bg"></div>
+<div class="glow" style="left:-80px;top:300px;width:320px;height:320px;background:#2a4bff"></div>
+<div class="glow" style="right:-60px;top:-60px;width:300px;height:300px;background:#0fb5a7"></div>
+
+<div class="abs hdr"><div class="logo">J</div>
+  <div><h1>JEV Automation Testing</h1><p>Explainable UI checks for mobile apps</p></div></div>
+<div class="abs tagr"><span>screenshots</span><span>live Appium</span><span>HTML / JSON report</span></div>
+
+<!-- Phone with 3 screens -->
+<div class="phone"><div class="screen">
+  <div class="scr" id="s0"><div class="bar"><span>9:41</span><span>●●●</span></div>
+    <div class="h">Welcome back</div><div class="sub">Sign in to continue</div>
+    <div class="field">Email</div><div class="field">Password</div>
+    <div class="btn">Sign in</div><div class="link">Forgot password?</div>
+    <div class="ill" style="height:60px;margin-top:18px;opacity:.6"></div></div>
+  <div class="scr" id="s1"><div class="bar"><span>9:41</span><span>●●●</span></div>
+    <div class="h raw" style="font-size:13px" id="rawkey">login.title</div>
+    <div class="sub">Discover topics you love</div>
+    <div class="ill"></div><div class="dots"><i class="on"></i><i></i><i></i></div>
+    <div class="btn">Next</div></div>
+  <div class="scr" id="s2"><div class="bar"><span>9:41</span><span>●●●</span></div>
+    <div class="h">Checkout</div><div class="sub">Order summary</div>
+    <div class="spin"></div>
+    <div class="sk" style="width:70%"></div><div class="sk"></div><div class="sk" style="width:55%"></div>
+    <div class="btn" style="background:#b9c6e8">Pay now</div></div>
+  <div class="flag" id="flag" style="left:9px;top:26px;width:100px;height:21px"></div>
+</div></div>
+<div class="abs fname" id="fn"></div>
+
+<div class="abs wire" style="left:226px;top:264px;width:54px"></div>
+<div class="abs wire" style="left:620px;top:264px;width:40px"></div>
+
+<div class="panel router">
+  <div class="t">Hybrid Check Router</div>
+  <div class="s">every check takes the cheapest path that can answer it</div>
+  <div class="lane" style="top:66px"><div class="n">1</div><span class="badge b-free">$0</span>
+    <div class="l">Rules</div><div class="d">presence · overlap · off-screen · truncation</div><div class="hl" id="h1"></div></div>
+  <div class="lane" style="top:152px"><div class="n">2</div>
+    <div class="l">JEV judgment</div><div class="d">i18n keys · typos · screen class · rubric score</div><div class="hl" id="h2"></div></div>
+  <div class="lane" style="top:238px"><div class="n">3</div>
+    <div class="l">Vision → JEV</div><div class="d">on demand: model observes, JEV decides</div><div class="hl" id="h3"></div></div>
+</div>
+
+<div class="panel report">
+  <div class="t">Report <span>report.html</span></div>
+  <div class="sum">
+    <div><b style="color:var(--pass)" id="cp">0</b><small>passed</small></div>
+    <div><b style="color:var(--fail)" id="cf">0</b><small>failed</small></div>
+    <div><b style="color:var(--review)" id="cr">0</b><small>review</small></div>
+  </div>
+  <div class="row" id="r0" style="top:92px"><div class="f">login.png <span class="badge b-pass">PASS</span></div>
+    <div class="c">confidence 0.94 · rules + jev</div><div class="r">Form visible, no error banner</div></div>
+  <div class="row" id="r1" style="top:170px"><div class="f">onboarding.png <span class="badge b-fail">FAIL</span></div>
+    <div class="c">confidence 0.91 · jev</div><div class="r">Raw i18n key shown: <span class="mono" style="color:var(--fail)">login.title</span></div></div>
+  <div class="row" id="r2" style="top:248px"><div class="f">checkout.png <span class="badge b-review">NEEDS REVIEW</span></div>
+    <div class="c">confidence 0.62 · vision + jev</div><div class="r">loading_stuck · below 0.75 gate</div></div>
+</div>
+
+<div class="abs dot" id="dot"></div>
+<div class="abs cap" id="c0">Each screen takes the <em>cheapest path</em>: free rules → JEV → vision on demand</div>
+<div class="abs cap" id="c1">JEV catches content bugs — with <em>confidence and reasoning</em></div>
+<div class="abs cap" id="c2">Confidence below 0.75 → <em>NEEDS REVIEW</em>, never a silent wrong verdict</div>
+<div class="abs foot">Deterministic pipeline · no LLM decides the next step · reproducible runs</div>
+
+<script src="common.js"></script>
+<script>
+window.DURATION = 12;
+const names = ["login.png", "onboarding.png", "checkout.png"];
+const lanesFor = [[1, 2], [1, 2], [1, 2, 3]];
+const rowY = [127, 205, 283];
+const S = i => 0.6 + i * 3.4;
+window.onFrame = t => {
+  const out = 1 - ramp(t, 11.3, 11.9);            // loop reset
+  // screens crossfade
+  for (let i = 0; i < 3; i++) {
+    const s = S(i), e = i < 2 ? S(i + 1) : 12.5;
+    let o = i === 0 ? (1 - ramp(t, e - 0.4, e)) + ramp(t, 11.3, 11.9) : win(t, s - 0.4, e, 0.4);
+    if (i === 2) o *= out;
+    setO("#s" + i, o);
+  }
+  // filename label
+  const cur = t > 11.6 ? 0 : t < S(1) ? 0 : t < S(2) ? 1 : 2;
+  $("#fn").innerHTML = "screens/<b>" + names[cur] + "</b>";
+  setO("#fn", t > 11.6 ? ramp(t, 11.6, 11.95) : t > 11.3 ? out : 1);
+  // lanes
+  ["#h1", "#h2", "#h3"].forEach(id => setO(id, 0));
+  $("#h2").classList.remove("red");
+  for (let i = 0; i < 3; i++) {
+    const s = S(i);
+    lanesFor[i].forEach((ln, k) => {
+      const a = s + 0.75 + k * 0.6;
+      const o = win(t, a, a + 0.75, 0.2);
+      const el = $("#h" + ln);
+      if (o > 0) { setO(el, o); if (i === 1 && ln === 2) el.classList.add("red"); }
+    });
+  }
+  // flag on raw key
+  setO("#flag", win(t, S(1) + 1.45, S(2) - 0.1, 0.25), 0, 0, lerp(1.25, 1, ramp(t, S(1) + 1.45, S(1) + 1.75)));
+  // travelling dot
+  let dot = 0, x = 0, y = 264;
+  for (let i = 0; i < 3; i++) {
+    const s = S(i);
+    const endLanes = s + 0.75 + lanesFor[i].length * 0.6 + 0.15;
+    if (t >= s + 0.3 && t < s + 0.75) { const k = ramp(t, s + 0.3, s + 0.75); x = lerp(222, 300, k); dot = win(t, s + 0.3, s + 0.75, 0.1); }
+    if (t >= endLanes && t < endLanes + 0.5) {
+      const k = ramp(t, endLanes, endLanes + 0.5);
+      x = lerp(612, 676, k); y = lerp(264, rowY[i], k); dot = win(t, endLanes, endLanes + 0.5, 0.1);
+    }
+  }
+  const d = $("#dot"); d.style.left = x + "px"; d.style.top = y + "px"; d.style.opacity = dot;
+  // rows + counters
+  const counts = [0, 0, 0];
+  for (let i = 0; i < 3; i++) {
+    const at = S(i) + 0.75 + lanesFor[i].length * 0.6 + 0.65;
+    const o = ramp(t, at, at + 0.35) * out;
+    setO("#r" + i, o, (1 - ramp(t, at, at + 0.35)) * 10);
+    if (t >= at && t < 11.6) counts[i] = 1;
+  }
+  $("#cp").textContent = counts[0]; $("#cf").textContent = counts[1]; $("#cr").textContent = counts[2];
+  // captions
+  for (let i = 0; i < 3; i++) {
+    const s = S(i), e = i < 2 ? S(i + 1) : 11.9;
+    setO("#c" + i, win(t, s - 0.1, e, 0.35), (1 - ramp(t, s - 0.1, s + 0.3)) * 6);
+  }
+};
+</script>
+</body></html>
