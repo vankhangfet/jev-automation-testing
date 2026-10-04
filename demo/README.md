@@ -35,7 +35,38 @@ catch-all):
 | `no_error_banner` | pass/fail | red banner (04) |
 | `layout_polish` | score ≥ 0.75 | general polish |
 
+## Set up environment variables
+
+The run needs two API sources — a JEV key and a vision model (see the root
+[README](../README.md#configuration) for details):
+
+| Variable | Purpose |
+|---|---|
+| `TYPESAFE_API_KEY` | JEV judgment engine (from [console.typesafe.ai](https://console.typesafe.ai)) |
+| `LLM_URL` + `MODEL_NAME` | Any multimodal endpoint (Ollama, vLLM, OpenRouter, OpenAI/Anthropic-compatible) — takes priority over Option B |
+| `LLM_API_KEY` | Key for that endpoint — leave empty for local servers |
+| `ANTHROPIC_API_KEY` | Fallback vision source (Claude Haiku) if `LLM_URL`/`MODEL_NAME` are not set |
+
+Copy the template and fill in your keys:
+
+```bash
+cp demo/.env.example demo/.env      # bash
+copy demo\.env.example demo\.env    # PowerShell
+```
+
+`.env` is git-ignored, so your keys never reach the repo.
+
 ## Run it
+
+The runner scripts load `.env` automatically (they also pick up a `.env` at the
+repo root), so a filled-in file is all you need:
+
+```bash
+./demo/run.sh               # bash
+.\demo\run.ps1              # PowerShell
+```
+
+Equivalent to:
 
 ```bash
 export TYPESAFE_API_KEY=...        # JEV
@@ -45,6 +76,18 @@ export LLM_URL=... MODEL_NAME=...  # any multimodal vision model
 uv run python -m jev_ui_agent check-screenshots \
   --dir demo/screens/login --rules demo/rules/login.yaml --out demo/reports
 ```
+
+Any extra flags pass through, e.g. `./demo/run.sh --workers 8 --limit 2`.
+
+## Results
+
+The run writes everything into `demo/reports/check-<timestamp>/`:
+
+- `report.html` — open this; failing screens first, each with confidence + evidence
+- `report.json` — same data for CI
+- `checkpoint.jsonl` — per-image progress (pass to `--resume` to continue an interrupted run without paying again)
+
+`demo/reports/` is git-ignored — results stay on your machine.
 
 ## Expected results
 
