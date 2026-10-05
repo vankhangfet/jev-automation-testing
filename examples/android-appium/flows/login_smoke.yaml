@@ -1,9 +1,14 @@
+# Example flow: drive Now in Android (NIA) and judge each checkpoint screen.
+# Walkthrough: examples/android-appium/README.md
+#
+# Selectors: res-id: / acc-id: / text: / xpath:  (find real values with
+# Appium Inspector). Actions: launch / tap / input / swipe.
 name: login_smoke
 app: com.google.samples.apps.nowinandroid
 platform: android
 steps:
   - action: launch
-  - checkpoint: home
+  - checkpoint: home        # capture screenshot + UI tree, run all check groups
   - action: tap
     target: "acc-id:Topics"
   - checkpoint: topics

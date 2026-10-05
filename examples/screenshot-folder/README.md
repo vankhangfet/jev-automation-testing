@@ -1,9 +1,9 @@
-# Demo: check a folder of login screenshots
+# Example 1: check a folder of login screenshots
 
-This demo shows **Mode 1 (screenshot folder checking)** end-to-end, without any
-device. `screens/login/` holds 5 synthetic mobile login screens: one correct,
-four with a planted defect each. `rules/login.yaml` is written to catch exactly
-those defects.
+This example shows **Mode 1 (screenshot folder checking)** end-to-end, without
+any device. `screens/login/` holds 5 synthetic mobile login screens: one
+correct, four with a planted defect each. `rules/login.yaml` is written to
+catch exactly those defects.
 
 ## The screens
 
@@ -38,7 +38,7 @@ catch-all):
 ## Set up environment variables
 
 The run needs two API sources — a JEV key and a vision model (see the root
-[README](../README.md#configuration) for details):
+[README](../../README.md#configuration) for details):
 
 | Variable | Purpose |
 |---|---|
@@ -50,8 +50,8 @@ The run needs two API sources — a JEV key and a vision model (see the root
 Copy the template and fill in your keys:
 
 ```bash
-cp demo/.env.example demo/.env      # bash
-copy demo\.env.example demo\.env    # PowerShell
+cp examples/screenshot-folder/.env.example examples/screenshot-folder/.env   # bash
+copy examples\screenshot-folder\.env.example examples\screenshot-folder\.env # PowerShell
 ```
 
 `.env` is git-ignored, so your keys never reach the repo.
@@ -71,8 +71,8 @@ The runner scripts load `.env` automatically (they also pick up a `.env` at the
 repo root), so a filled-in file is all you need:
 
 ```bash
-./demo/run.sh               # bash
-.\demo\run.ps1              # PowerShell
+./examples/screenshot-folder/run.sh                    # bash
+.\examples\screenshot-folder\run.ps1                   # PowerShell
 ```
 
 Equivalent to:
@@ -83,20 +83,22 @@ export LLM_URL=... MODEL_NAME=...  # any multimodal vision model
 # (or export ANTHROPIC_API_KEY=... to use Claude Haiku)
 
 uv run python -m jev_ui_agent check-screenshots \
-  --dir demo/screens/login --rules demo/rules/login.yaml --out demo/reports
+  --dir examples/screenshot-folder/screens/login \
+  --rules examples/screenshot-folder/rules/login.yaml \
+  --out examples/screenshot-folder/reports
 ```
 
-Any extra flags pass through, e.g. `./demo/run.sh --workers 8 --limit 2`.
+Any extra flags pass through, e.g. `./examples/screenshot-folder/run.sh --workers 8 --limit 2`.
 
 ## Results
 
-The run writes everything into `demo/reports/check-<timestamp>/`:
+The run writes everything into `examples/screenshot-folder/reports/check-<timestamp>/`:
 
 - `report.html` — open this; failing screens first, each with confidence + evidence
 - `report.json` — same data for CI
 - `checkpoint.jsonl` — per-image progress (pass to `--resume` to continue an interrupted run without paying again)
 
-`demo/reports/` is git-ignored — results stay on your machine.
+The folder is git-ignored — results stay on your machine.
 
 ## Expected results
 
@@ -109,8 +111,8 @@ The run writes everything into `demo/reports/check-<timestamp>/`:
 | `05_login_blank.png` | ❌ failed | `login_form_visible` (and low `layout_polish`) |
 
 The command exits `1` (defects found — that is the point of the demo). Open
-`demo/reports/check-*/report.html`: failing screens are listed first, each with
-confidence and evidence explaining *why* it failed.
+`examples/screenshot-folder/reports/check-*/report.html`: failing screens are
+listed first, each with confidence and evidence explaining *why* it failed.
 
 > Exact verdicts can vary slightly per run (a low-confidence answer lands in
 > `NEEDS_REVIEW` instead of pass/fail) — that is the confidence gate at work,
