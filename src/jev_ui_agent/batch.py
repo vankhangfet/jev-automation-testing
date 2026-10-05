@@ -137,6 +137,7 @@ def run_batch(*, images_dir, rules_path, policy_path, out_root, workers: int = 4
               vision: VisionBridge | None = None) -> RunReport:
     if jev is None or vision is None:
         raise ValueError("check-screenshots cần cả jev và vision client")
+    started_at = datetime.now().isoformat(timespec="seconds")
     policy = load_yaml(policy_path)
     rules = load_rules(rules_path)
     gate = float(policy.get("confidence_gate", 0.75))
@@ -233,7 +234,8 @@ def run_batch(*, images_dir, rules_path, policy_path, out_root, workers: int = 4
     counts["rules"] = len(rules["rules"])
 
     report = RunReport(run_id=run_id, flow_name=f"rules:{rules['name']}",
-                       started_at=datetime.now().isoformat(timespec="seconds"),
+                       started_at=started_at,
+                       finished_at=datetime.now().isoformat(timespec="seconds"),
                        checkpoints=sorted(cps, key=lambda c: _ORDER[_image_status(c)]),
                        summary=counts)
     report.costs["jev"] = dict(jev.usage)

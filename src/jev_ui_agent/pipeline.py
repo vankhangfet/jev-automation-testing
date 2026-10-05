@@ -129,6 +129,7 @@ def run_flow(*, flow_path: Path | str, policy_path: Path | str,
     if vision is not None:
         report.costs["vision"] = {"calls": vision.calls}
 
+    report.finished_at = datetime.now().isoformat(timespec="seconds")
     (out_dir / "report.json").write_text(render_json(report), encoding="utf-8")
     (out_dir / "report.html").write_text(render_html(report), encoding="utf-8")
     return report

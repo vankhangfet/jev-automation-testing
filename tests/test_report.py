@@ -52,3 +52,26 @@ def test_render_html_summary_section():
 
 def test_render_html_no_summary_when_empty():
     assert "Batch summary" not in render_html(sample_report())
+
+
+def test_render_json_includes_finished_at():
+    rep = sample_report()
+    rep.finished_at = "2026-10-02T10:04:30"
+    data = json.loads(render_json(rep))
+    assert data["started_at"] == "2026-10-02T10:00:00"
+    assert data["finished_at"] == "2026-10-02T10:04:30"
+
+
+def test_render_html_shows_start_end_and_duration():
+    rep = sample_report()
+    rep.finished_at = "2026-10-02T10:04:32"
+    html = render_html(rep)
+    assert "10:00:00" in html
+    assert "kết thúc" in html and "10:04:32" in html
+    assert "4m 32s" in html
+
+
+def test_render_html_without_finished_at_hides_end():
+    html = render_html(sample_report())  # finished_at để trống (default)
+    assert "kết thúc" not in html
+    assert "10:00:00" in html  # thời gian bắt đầu vẫn hiển thị

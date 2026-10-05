@@ -1,8 +1,32 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from jinja2 import Environment
 
 from jev_ui_agent.models import RunReport, Verdict
+
+
+def _human_duration(seconds: float) -> str:
+    s = int(seconds)
+    h, rem = divmod(s, 3600)
+    m, sec = divmod(rem, 60)
+    if h:
+        return f"{h}h {m:02d}m {sec:02d}s"
+    if m:
+        return f"{m}m {sec:02d}s"
+    return f"{sec}s"
+
+
+def _duration_text(report: RunReport) -> str:
+    """'· 4m 32s' khi tính được thời lượng, chuỗi rỗng khi thiếu/không parse được."""
+    if not report.finished_at:
+        return ""
+    try:
+        delta = datetime.fromisoformat(report.finished_at) - datetime.fromisoformat(report.started_at)
+    except ValueError:
+        return ""
+    return f" · {_human_duration(delta.total_seconds())}"
 
 _BADGES = {
     Verdict.PASS: "badge pass", Verdict.FAIL: "badge fail",
@@ -34,7 +58,7 @@ _TEMPLATE = """<!doctype html>
 </style></head>
 <body>
 <h1>JEV UI Checking — {{ report.flow_name }}</h1>
-<p class="meta">Run <b>{{ report.run_id }}</b> · bắt đầu {{ report.started_at }}
+<p class="meta">Run <b>{{ report.run_id }}</b> · bắt đầu {{ report.started_at }}{% if report.finished_at %} · kết thúc {{ report.finished_at }}{{ duration }}{% endif %}
    · {{ report.checkpoints | length }} checkpoint</p>
 {% if report.summary %}
 <div class="card"><h2>Batch summary</h2>
@@ -87,4 +111,5 @@ _env = Environment(autoescape=True)
 
 
 def render_html(report: RunReport) -> str:
-    return _env.from_string(_TEMPLATE).render(report=report, badges=_BADGES)
+    return _env.from_string(_TEMPLATE).render(
+        report=report, badges=_BADGES, duration=_duration_text(report))

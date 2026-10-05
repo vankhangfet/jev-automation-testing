@@ -108,6 +108,13 @@ def test_run_batch_pass_and_costs(img_dir, tmp_path):
     assert data["summary"]["total_images"] == 4
     lines = (run_dir / "checkpoint.jsonl").read_text(encoding="utf-8").splitlines()
     assert len(lines) == 4 and all(json.loads(l)["status"] == "done" for l in lines)
+    # Thời gian bắt đầu/kết thúc: có đủ, bắt đầu không muộn hơn kết thúc,
+    # và phải nằm trong report.json (CI đọc được)
+    assert report.started_at and report.finished_at
+    assert report.started_at <= report.finished_at
+    data2 = json.loads((run_dir / "report.json").read_text(encoding="utf-8"))
+    assert data2["started_at"] == report.started_at
+    assert data2["finished_at"] == report.finished_at
 
 
 LANG_RULES = """

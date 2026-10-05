@@ -105,6 +105,7 @@ class RunReport:
     run_id: str
     flow_name: str
     started_at: str
+    finished_at: str = ""  # ISO; rỗng khi run chưa kết thúc/bị kill giữa chừng
     checkpoints: list[CheckpointReport] = field(default_factory=list)
     failed_steps: list[str] = field(default_factory=list)
     costs: dict[str, Any] = field(default_factory=dict)
