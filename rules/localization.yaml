@@ -3,8 +3,11 @@
 # Use when you have ONE folder of mixed screenshots (no per-feature split):
 # every screen runs through the same visual-defect rules.
 #
-# EDIT ME: replace "Vietnamese" with your build's target language
-# (rules: no_untranslated_text, not_wrong_language, no_mixed_languages).
+# PER-IMAGE LANGUAGE: rules containing {language} are parameterized from the
+# image filename suffix -<lang> (e.g. 'events_filter_advanced_2-en.png' ->
+# 'English', 'home-vi.png' -> 'Vietnamese'). Images with no -<lang> suffix
+# get those rules SKIPPED (with the reason in evidence) instead of a wrong
+# verdict. No need to split folders per locale.
 #
 # Run:
 #   uv run python -m jev_ui_agent check-screenshots \
@@ -17,7 +20,7 @@
 # color/font/design preferences.
 name: localization_defects
 rules:
-  # --- text & layout rendering ---
+  # --- text & layout rendering (locale-agnostic) ---
   - id: no_text_clipping
     instruction: "No text is clipped or cut off: every character of every visible label, title, button, tab and input text is fully rendered, with no lines or words sliced off at an edge. (Visual layout defect only - ignore business logic, behavior, wording or grammar quality, and color, font or design preferences.)"
 
@@ -30,20 +33,20 @@ rules:
   - id: no_overlapping_elements
     instruction: "No UI elements unintentionally overlap each other: buttons, input fields, images, icons, banners and navigation bars do not cover one another; each element's area is visually distinct. Text rendered over a photo or illustration background is acceptable. (Visual layout defect only - ignore business logic, behavior, and color, font or design preferences.)"
 
-  # --- localization / language ---
+  # --- localization / language (expected language from filename tag) ---
   - id: no_untranslated_text
-    instruction: "All user-visible text is fully translated into Vietnamese: no leftover untranslated source-language strings (for example English) remain in buttons, labels, menus, hints or error messages. Proper nouns and brand names are acceptable. (Localization defect only - ignore business logic, behavior, wording or grammar quality, and color, font or design preferences.)"
+    instruction: "All user-visible text is fully translated into {language}: no leftover untranslated source-language strings (for example English, when {language} is not English) remain in buttons, labels, menus, hints or error messages. Proper nouns, brand names and logos are acceptable. (Localization defect only - ignore business logic, behavior, wording or grammar quality, and color, font or design preferences.)"
 
   - id: no_localization_keys
-    instruction: "No raw localization keys, resource IDs or format placeholders are displayed to the user: text never looks like 'login.title', 'auth.subtitle.hint', 'menu.settings_label', '{username}' or '%s'. (Localization defect only - ignore business logic, behavior, and color, font or design preferences.)"
+    instruction: "No raw localization keys, resource IDs or format placeholders are displayed to the user: text never looks like 'login.title', 'auth.subtitle.hint' or 'menu.settings_label', and no unresolved placeholder or printf tokens appear inside visible text. This check works in any language. (Localization defect only - ignore business logic, behavior, and color, font or design preferences.)"
 
   - id: no_mixed_languages
-    instruction: "The screen uses a single language consistently: user-visible text is in Vietnamese and does not unintentionally mix two languages in the same view. Proper nouns, brand names and technical symbols are acceptable. (Localization defect only - ignore business logic, behavior, wording or grammar quality, and color, font or design preferences.)"
+    instruction: "The screen uses {language} consistently: user-visible text does not unintentionally mix {language} with another language in the same view. Proper nouns, brand names and technical symbols are acceptable. (Localization defect only - ignore business logic, behavior, wording or grammar quality, and color, font or design preferences.)"
 
   - id: not_wrong_language
-    instruction: "The language of all user-visible text matches the expected target language: the screen is in Vietnamese, not in another language (for example English, Chinese or Japanese). (Localization defect only - ignore business logic, behavior, wording or grammar quality, and color, font or design preferences.)"
+    instruction: "The language of all user-visible text is {language} (the expected target language for this screen's locale), not another language. (Localization defect only - ignore business logic, behavior, wording or grammar quality, and color, font or design preferences.)"
 
-  # --- translation-induced layout damage ---
+  # --- translation-induced layout damage (locale-agnostic) ---
   - id: no_translation_wrapping
     instruction: "No text wraps awkwardly because of translation length: no single orphan word alone on the last line of a narrow button or label, no words broken mid-word across lines, no line wrapping that makes a short control look broken. (Translation-caused layout defect only - ignore business logic, behavior, wording or grammar quality, and color, font or design preferences.)"
 

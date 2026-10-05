@@ -110,6 +110,76 @@ def test_run_batch_pass_and_costs(img_dir, tmp_path):
     assert len(lines) == 4 and all(json.loads(l)["status"] == "done" for l in lines)
 
 
+LANG_RULES = """
+name: lang
+rules:
+  - id: visual_ok
+    instruction: "No text is clipped"
+  - id: not_wrong_language
+    instruction: "The language of all user-visible text is {language}, not another language"
+"""
+
+
+class CapturingJev(FakeJev):
+    """FakeJev giữ lại instructions thực tế mà JEV nhận được cho từng ảnh."""
+
+    def __init__(self):
+        super().__init__()
+        self.seen: dict[str, dict[str, str]] = {}
+
+    def judge(self, state, questions):
+        self.seen[state["image"]] = {rid: getattr(q, "instructions", "") for rid, q in questions.items()}
+        return super().judge(state, questions)
+
+
+def test_language_rules_substitute_from_filename_tag(tmp_path):
+    d = tmp_path / "shots"
+    d.mkdir()
+    (d / "events_filter_advanced_2-en.png").write_bytes(b"\x89PNG\r\n\x1a\nAAA")
+    (d / "home-vi.png").write_bytes(b"\x89PNG\r\n\x1a\nBBB")
+    (d / "no_tag.png").write_bytes(b"\x89PNG\r\n\x1a\nCCC")
+    p = tmp_path / "rules.yaml"
+    p.write_text(LANG_RULES, encoding="utf-8")
+
+    jev = CapturingJev()
+    report = run_batch(images_dir=d, rules_path=p,
+                       policy_path=FIX / "policy_test.yaml", out_root=tmp_path / "r",
+                       jev=jev, vision=FakeVision())
+    by_name = {cp.checkpoint: cp for cp in report.checkpoints}
+
+    # Ảnh có tag: instruction được thay bằng tên ngôn ngữ, không còn placeholder
+    assert "English" in jev.seen["events_filter_advanced_2-en.png"]["not_wrong_language"]
+    assert "{language}" not in jev.seen["events_filter_advanced_2-en.png"]["not_wrong_language"]
+    assert "Vietnamese" in jev.seen["home-vi.png"]["not_wrong_language"]
+
+    # Ảnh KHÔNG có tag: rule ngôn ngữ bị SKIPPED kèm lý do, không hỏi JEV
+    assert "not_wrong_language" not in jev.seen["no_tag.png"]
+    skipped = {r.check_id: r for r in by_name["no_tag.png"].results}["rule/not_wrong_language"]
+    assert skipped.verdict is Verdict.SKIPPED
+    assert "suffix" in skipped.evidence["skipped"]
+
+    # Rule visual vẫn chạy bình thường cho mọi ảnh (kể cả không tag)
+    for name in ("events_filter_advanced_2-en.png", "home-vi.png", "no_tag.png"):
+        res = {r.check_id: r for r in by_name[name].results}
+        assert res["rule/visual_ok"].verdict is Verdict.PASS
+
+    # Evidence của rule ngôn ngữ cho ảnh có tag chứa instruction ĐÃ thay thế
+    res = {r.check_id: r for r in by_name["home-vi.png"].results}
+    assert "Vietnamese" in res["rule/not_wrong_language"].evidence["instruction"]
+
+
+def test_load_rules_rejects_unknown_placeholder(tmp_path):
+    from jev_ui_agent.rules import RulesError, load_rules
+    p = tmp_path / "bad.yaml"
+    p.write_text('name: t\nrules:\n  - id: x\n    instruction: "Text is {lang}"\n',
+                 encoding="utf-8")
+    with pytest.raises(RulesError, match="placeholder"):
+        load_rules(p)
+    p.write_text('name: t\nrules:\n  - id: x\n    instruction: "Text is {language}"\n',
+                 encoding="utf-8")
+    assert load_rules(p)["rules"][0]["instruction"] == "Text is {language}"
+
+
 def test_fail_verdict_and_gate(img_dir, tmp_path):
     class PickyJev(FakeJev):
         def judge(self, state, questions):

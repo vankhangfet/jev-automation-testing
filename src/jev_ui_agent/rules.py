@@ -5,8 +5,14 @@ from pathlib import Path
 
 import yaml
 
+from jev_ui_agent.langtag import LANG_PLACEHOLDER
+
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]*$")
 _TYPES = {"noul", "score"}
+# Placeholder hợp lệ trong instruction; cái khác ({lang}, {target}...) gần như
+# chắc chắn là gõ sai -> chặn ngay lúc load thay vì âm thầm không thay thế.
+_ALLOWED_PLACEHOLDERS = {LANG_PLACEHOLDER}
+_PLACEHOLDER_RE = re.compile(r"\{[a-z_]+\}")
 
 DEFAULT_SCORE_CRITERIA = [
     "Completely fails the requirement.",
@@ -46,6 +52,11 @@ def load_rules(path: Path | str) -> dict:
         instruction = item.get("instruction")
         if not isinstance(instruction, str) or not instruction.strip():
             raise RulesError(f"Rule {rid!r}: cần 'instruction' không rỗng")
+        for ph in _PLACEHOLDER_RE.findall(instruction):
+            if ph not in _ALLOWED_PLACEHOLDERS:
+                raise RulesError(
+                    f"Rule {rid!r}: placeholder không hỗ trợ {ph!r} "
+                    f"(chỉ dùng {LANG_PLACEHOLDER}, thay bằng ngôn ngữ từ đuôi tên file ảnh)")
         rtype = item.get("type", "noul")
         if rtype not in _TYPES:
             raise RulesError(f"Rule {rid!r}: type phải thuộc {sorted(_TYPES)}, got {rtype!r}")

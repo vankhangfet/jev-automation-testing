@@ -10,6 +10,7 @@ from pathlib import Path
 from jev_ui_agent.checks.composite import apply_confidence_gate
 from jev_ui_agent.jev.client import JevClient, JevError
 from jev_ui_agent.jev.rule_questions import build_questions
+from jev_ui_agent.langtag import LANG_PLACEHOLDER, detect_language_tag, language_name
 from jev_ui_agent.models import CheckResult, CheckpointReport, RunReport, Verdict
 from jev_ui_agent.pipeline import load_yaml
 from jev_ui_agent.report.html import render_html
@@ -64,10 +65,30 @@ def _judge_image(path: Path, rules: dict, jev: JevClient, vision: VisionBridge,
     cp = CheckpointReport(checkpoint=path.name, screenshot=str(path).replace("\\", "/"))
     try:
         observation = vision.observe_detailed(str(path))
-        payload = {"image": path.name, "screen_observation": observation}
-        answers = jev.judge(payload, build_questions(rules["rules"]))
-        results: list[CheckResult] = []
+        # Rule chứa {language} được tham số hóa theo đuôi tên file (vd '-en').
+        # Ảnh không có tag -> các rule đó SKIPPED kèm lý do, không hỏi JEV.
+        tag = detect_language_tag(path.name)
+        lang = language_name(tag) if tag else None
+        prepared: list[tuple[dict, CheckResult | None]] = []
         for rule in rules["rules"]:
+            instruction = rule["instruction"]
+            if LANG_PLACEHOLDER in instruction:
+                if lang is None:
+                    prepared.append((rule, CheckResult(
+                        f"rule/{rule['id']}", "rules", "vision+jev", Verdict.SKIPPED,
+                        evidence={"instruction": instruction, "skipped":
+                                  "filename has no -<lang> suffix; expected language unknown"})))
+                    continue
+                rule = {**rule, "instruction": instruction.replace(LANG_PLACEHOLDER, lang)}
+            prepared.append((rule, None))
+        asked = [rule for rule, skipped in prepared if skipped is None]
+        payload = {"image": path.name, "screen_observation": observation}
+        answers = jev.judge(payload, build_questions(asked)) if asked else {}
+        results: list[CheckResult] = []
+        for rule, skipped in prepared:
+            if skipped is not None:
+                results.append(skipped)
+                continue
             ans = answers.get(rule["id"])
             if ans is None:
                 results.append(CheckResult(f"rule/{rule['id']}", "rules", "vision+jev",
