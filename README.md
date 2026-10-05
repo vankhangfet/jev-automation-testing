@@ -107,6 +107,8 @@ Useful flags: `--out reports/login`, `--workers 4`, `--limit 50`, `--no-recursiv
 
 **Tips:** describe things that are visible on screen, be specific (`"a button labeled 'Sign in'"`), and write rules in English for the best accuracy.
 
+**No per-feature split needed:** [`rules/localization.yaml`](rules/localization.yaml) is a ready-made generic ruleset for mixed screenshot folders — it detects only visual localization defects (text clipping, overflow, overlapping text/elements, untranslated text, i18n keys, mixed/wrong language, translation-caused wrapping and layout breaks) and ignores business logic, wording/grammar and design preferences. Edit the target language and run it over any folder.
+
 **Try it now:** [`demo/`](demo/) contains 5 ready-made login screenshots (4 with planted defects) plus matching rules — see [demo/README.md](demo/README.md).
 
 ### Mode 2: Live UI automation (Appium)
