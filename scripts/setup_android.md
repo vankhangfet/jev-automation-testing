@@ -1,6 +1,6 @@
 # Setup môi trường Android E2E (Windows)
 
-Runbook cho Task 13: chạy E2E smoke `flows/login_smoke.yaml` trên Android emulator
+Runbook cho Task 13: chạy E2E smoke `examples/android-appium/flows/login_smoke.yaml` trên Android emulator
 qua Appium (UiAutomator2). Các mục đánh dấu **[ĐÃ SẴN]** đã được kiểm tra/cài trên
 máy này ngày 2026-10-03; các mục **[USER]** cần bạn tự làm (GUI/API key).
 
@@ -132,7 +132,7 @@ Thiếu key thì run vẫn hoạt động: JEV content-quality và vision checks
   connect tới `127.0.0.1:4723` với capabilities giống mục `android` trong
   `config/devices.yaml`, duyệt các màn Home → Topics → Settings của app thật để
   lấy selector đúng. Cập nhật:
-  - `flows/login_smoke.yaml` (các `target: "acc-id:..."`)
+  - `examples/android-appium/flows/login_smoke.yaml` (các `target: "acc-id:..."`)
   - `config/policy.yaml` (mục `functional_expectations`)
   Mục tiêu: cả 3 checkpoint `home` / `topics` / `settings` capture được screenshot.
 
@@ -148,7 +148,7 @@ appium                                   # server tại 127.0.0.1:4723
 Terminal 2 — chạy flow (repo root):
 
 ```powershell
-uv run python -m jev_ui_agent run --flow flows/login_smoke.yaml --driver android
+uv run python -m jev_ui_agent run --flow examples/android-appium/flows/login_smoke.yaml --driver android
 ```
 
 Expected:
@@ -178,6 +178,6 @@ Report: reports/run-<timestamp>/report.html
    nối đồng thời — trên Appium 2, `deviceName` chỉ mang tính thông tin, không
    còn dùng để chọn thiết bị.
 3. **Selector phải tune theo app thật** bằng Appium Inspector (mục 6) rồi cập
-   nhật `flows/login_smoke.yaml` + `config/policy.yaml`
+   nhật `examples/android-appium/flows/login_smoke.yaml` + `config/policy.yaml`
    (`functional_expectations`); tiêu chí hoàn thành là các checkpoint
    home/topics/settings đều capture được.

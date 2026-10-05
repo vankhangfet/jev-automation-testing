@@ -63,16 +63,20 @@ uv run python -m jev_ui_agent run --flow flows/demo_fake.yaml \
 
 Open `reports/run-*/report.html`. The fixtures include a planted `login.title` i18n bug, which JEV flags when `TYPESAFE_API_KEY` is set.
 
-## Demo: 5 login screens, 4 planted bugs
+## Examples
 
-The [`demo/`](demo/) folder is a self-contained walkthrough of Mode 1 — no device needed. It ships **5 login screenshots with 4 planted defects** (broken layout with the button hanging off-screen, raw i18n keys, an error banner, a blank screen) and natural-language rules written to catch each one:
+Two runnable examples in [`examples/`](examples/), one per mode:
 
-```bash
-copy demo\.env.example demo\.env     # bash: cp — then fill in your keys
-.\demo\run.ps1                       # bash: ./demo/run.sh
-```
+- **[Screenshot folder](examples/screenshot-folder/)** (Mode 1, no device) — 5 login screenshots with **4 planted defects** (broken layout with the button off-screen, raw i18n keys, an error banner, a blank screen) and natural-language rules written to catch each one:
 
-Each buggy screen comes back `FAILED` with the failing rule and evidence explaining why; results land in `demo/reports/check-*/report.html`. Full walkthrough with expected outcomes per image: **[demo/README.md](demo/README.md)**.
+  ```bash
+  copy examples\screenshot-folder\.env.example examples\screenshot-folder\.env   # then fill in your keys
+  .\examples\screenshot-folder\run.ps1                # bash: ./examples/screenshot-folder/run.sh
+  ```
+
+  Each buggy screen comes back `FAILED` with the failing rule and evidence; results land in `examples/screenshot-folder/reports/check-*/report.html`.
+
+- **[Android app + Appium](examples/android-appium/)** (Mode 2) — drive a real app (Now in Android) through a YAML flow: launch → home → topics → settings, judging every checkpoint screen. Requires the [Android setup](scripts/setup_android.md); the offline fake-driver alternative is included.
 
 ---
 
@@ -111,7 +115,7 @@ Useful flags: `--out reports/login`, `--workers 4`, `--limit 50`, `--no-recursiv
 
 **Per-image expected language:** write rules with a `{language}` placeholder and name files with a 2-letter locale suffix — `events_filter_advanced_2-en.png` → "English", `home-vi.png` → "Vietnamese". The placeholder is substituted per image; files without a `-<lang>` suffix get those rules `SKIPPED` with the reason, instead of a wrong verdict.
 
-**Try it now:** [`demo/`](demo/) contains 5 ready-made login screenshots (4 with planted defects) plus matching rules — see [demo/README.md](demo/README.md).
+**Try it now:** [`examples/screenshot-folder/`](examples/screenshot-folder/) contains 5 ready-made login screenshots (4 with planted defects) plus matching rules.
 
 ### Mode 2: Live UI automation (Appium)
 
@@ -179,7 +183,7 @@ Exit codes: `0` all passed · `1` a check failed or an image errored · `2` conf
 
 ## Learn more
 
-- [Demo walkthrough](demo/README.md) — 5 login screens with planted defects, run it in one command
+- [Examples](examples/) — screenshot-folder checking (offline inputs) and Android Appium automation
 - [Design specs](docs/superpowers/specs/) and [implementation plans](docs/superpowers/plans/)
 - [Android E2E runbook](scripts/setup_android.md)
 - Demo animation and video sources: [docs/assets/src/](docs/assets/src/) (HTML scenes rendered with Playwright + ffmpeg)

@@ -24,10 +24,12 @@ uv run python -m jev_ui_agent run --flow flows/demo_fake.yaml \
   --driver fake --policy config/policy.fake.yaml --fixtures-dir tests/fixtures/fake_run
 
 # Mode 1 (needs TYPESAFE_API_KEY + a vision source in env)
-uv run python -m jev_ui_agent check-screenshots --dir demo/screens/login \
-  --rules demo/rules/login.yaml --out demo/reports
+uv run python -m jev_ui_agent check-screenshots \
+  --dir examples/screenshot-folder/screens/login \
+  --rules examples/screenshot-folder/rules/login.yaml \
+  --out examples/screenshot-folder/reports
 
-uv run python scripts/make_demo_screens.py   # regenerate demo PNGs (dev Pillow)
+uv run python scripts/make_demo_screens.py   # regenerate example PNGs (dev Pillow)
 ```
 
 Exit codes: `0` all passed · `1` failures/errors · `2` configuration error.

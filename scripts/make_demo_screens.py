@@ -1,8 +1,8 @@
-"""Generate the demo login screenshots for `demo/screens/login/`.
+"""Generate the demo login screenshots for `examples/screenshot-folder/screens/login/`.
 
 Each screen is a simple synthetic mobile login mock-up. One is correct; the
 rest carry one planted defect each so the demo rules in
-`demo/rules/login.yaml` have something real to catch.
+`examples/screenshot-folder/rules/login.yaml` have something real to catch.
 
 Run:  uv run python scripts/make_demo_screens.py
 """
@@ -13,7 +13,8 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 W, H = 360, 760
-OUT = Path(__file__).resolve().parents[1] / "demo" / "screens" / "login"
+OUT = (Path(__file__).resolve().parents[1] / "examples" / "screenshot-folder"
+       / "screens" / "login")
 
 BG = (249, 250, 252)
 INK = (31, 41, 55)
